@@ -11,6 +11,14 @@
     <h1>BeaverParty</h1>
     <p>Find MIT students to play with.</p>
     <p>Server status: <span id="status">checking...</span></p>
+    <div id="signed-out" hidden>
+      <p><a class="button" href="/auth/login">Log in with Touchstone</a></p>
+    </div>
+    <div id="signed-in" hidden>
+      <p>You're signed in.</p>
+      <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+    </div>
+    <p id="auth-off" hidden>Sign-in isn't set up on this server yet.</p>
   </main>
   <script src="app.js"></script>
 </body>

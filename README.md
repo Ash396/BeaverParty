@@ -36,13 +36,22 @@ The tests run the whole sign-in flow against a fake Petrock on localhost.
 
 ## Deploy on Hyades
 
-[Hyades](https://hyades.mit.edu/inessential.html) is SIPB's free hosting. It runs the `Dockerfile` image as a microVM at `https://beaverparty.sipb.cloud`.
+[Hyades](https://hyades.mit.edu/inessential.html) is SIPB's free hosting. It runs our Docker image as a small VM at `https://beaverparty.sipb.cloud`.
 
-1. Build and push the image to a registry Hyades can pull from, such as forgejo.mit.edu or Docker Hub.
-2. On Hyades, run `create beaverparty IMAGE 3000`, or `update` if the app already exists.
-3. Run `edit` and add the same settings as `.env` under `"envs"`, with `BASE_URL` set to `https://beaverparty.sipb.cloud`. Then run `restart beaverparty`.
+Every push to `main` runs the tests, then builds the image and publishes it to `ghcr.io/ash396/beaverparty:latest` (see `.github/workflows/ci.yml`).
 
-Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a redirect URL.
+First-time setup:
+
+1. On GitHub, open the repo's **Packages** → `beaverparty` → **Package settings** and set its visibility to **Public**, so Hyades can download the image.
+2. Log in to Hyades: `kinit KERB@ATHENA.MIT.EDU`, then `ssh -K KERB@hyades.mit.edu`.
+3. Create the app. If a test app named `beaverparty` already exists, first run `delete beaverparty`.
+   `create beaverparty ghcr.io/ash396/beaverparty:latest 3000`
+4. Run `edit` and add the settings under `"envs"` for `beaverparty`. Use the same values as your `.env`, but set `BASE_URL` to `https://beaverparty.sipb.cloud`. Leave out `DEBUG_SHOW_IDENTITY`.
+5. `start beaverparty`. Check `status beaverparty` and `logs beaverparty`.
+
+To ship a new version later, merge to `main`, wait for CI to go green, then run `update` on Hyades (Hyades also updates images daily).
+
+Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a redirect URL. Accounts are kept in memory for now, so a restart forgets them (and any bans) until we add a database.
 
 ## Layout
 

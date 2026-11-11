@@ -95,7 +95,7 @@ async function fetchUserinfo(config, accessToken) {
   return res.json();
 }
 
-// Returns { email, affiliation } for the person who just signed in.
+// Returns { email, affiliation, name } for the person who just signed in.
 async function completeSignIn(config, code, expectedNonce) {
   const tokens = await exchangeCode(config, code);
   const idClaims = await verifyIdToken(config, tokens.id_token, expectedNonce);
@@ -104,7 +104,8 @@ async function completeSignIn(config, code, expectedNonce) {
   const email = String(info.email || idClaims.email || "").trim().toLowerCase();
   if (!email) throw new Error("no email returned");
   const affiliation = String(info.affiliation || idClaims.affiliation || "").trim().toLowerCase();
-  return { email, affiliation };
+  const name = String(info.name || idClaims.name || "");
+  return { email, affiliation, name };
 }
 
 module.exports = { authorizationUrl, completeSignIn };

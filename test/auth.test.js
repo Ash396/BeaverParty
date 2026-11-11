@@ -146,3 +146,25 @@ test("a tampered session cookie is not signed in", async () => {
   const me = await (await fetch(`${base}/api/me`, { headers: { Cookie: tampered } })).json();
   assert.equal(me.signedIn, false);
 });
+
+test("with DEBUG_SHOW_IDENTITY on, the test page shows what Petrock sent", async () => {
+  config.debugShowIdentity = true;
+  try {
+    fake.nextUser = { email: "tim@mit.edu", affiliation: "student" };
+    const login = await fetch(`${base}/auth/login`, { redirect: "manual" });
+    const atProvider = await fetch(login.headers.get("location"), { redirect: "manual" });
+    const callback = await fetch(atProvider.headers.get("location"), {
+      redirect: "manual",
+      headers: { Cookie: login.headers.get("set-cookie").split(";")[0] },
+    });
+    assert.equal(callback.status, 200);
+    const html = await callback.text();
+    assert.match(html, /tim@mit\.edu/);
+    assert.match(html, /Tim Beaver/);
+    assert.match(html, /student/);
+    assert.match(html, /signed in/);
+    assert.ok(callback.headers.getSetCookie().some((c) => c.startsWith("bp_session=")));
+  } finally {
+    config.debugShowIdentity = false;
+  }
+});

@@ -22,6 +22,8 @@ Then open http://localhost:3000. A health check is at http://localhost:3000/api/
    `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 4. Restart with `npm start` and click "Log in with Touchstone".
 
+To check what Petrock sends, add `DEBUG_SHOW_IDENTITY=1` to `.env`. After login you'll see your email, name, affiliation, and anonymous ID on a one-time page. Nothing is saved, but leave it off anywhere real users sign in.
+
 Sign-in follows figure 2 of the proposal. The server exchanges Petrock's one-time code for tokens itself, checks the ID token's signature, and lets in only `student` affiliations. It keeps only `HMAC(ANON_ID_KEY, email)` as the account ID, drops the email and name, refuses banned accounts, and sets a 7-day session cookie. Accounts live in memory until we pick a database.
 
 ### Tests

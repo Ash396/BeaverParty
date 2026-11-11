@@ -37,6 +37,54 @@ function json(res, status, body, extraHeaders = {}) {
   res.end(JSON.stringify(body));
 }
 
+// Picks where a just-verified person goes, and creates the account and
+// session cookie if they're allowed in.
+function decide(config, person) {
+  if (!config.allowedAffiliations.includes(person.affiliation)) {
+    return { location: "/students-only.html", cookies: [], result: "refused: not a student" };
+  }
+  const anonId = anonIdFor(config, person.email);
+  const existing = accounts.find(anonId);
+  if (existing && existing.banned) {
+    return { location: "/banned.html", cookies: [], result: "refused: banned", anonId };
+  }
+  accounts.findOrCreate(anonId);
+  const maxAgeSeconds = Math.round(config.sessionDays * 24 * 3600);
+  const session = sign(config.sessionSecret, { anonId, exp: Date.now() + maxAgeSeconds * 1000 });
+  return {
+    location: "/",
+    cookies: [cookie(SESSION_COOKIE, session, { maxAgeSeconds, secure: config.secureCookies })],
+    result: "signed in",
+    anonId,
+  };
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+}
+
+function debugPage(res, person, outcome) {
+  const rows = [
+    ["Email", person.email],
+    ["Name", person.name || "(none sent)"],
+    ["Affiliation", person.affiliation || "(none sent)"],
+    ["Result", outcome.result],
+    ["Anonymous ID", outcome.anonId || "(not created)"],
+  ].map(([k, v]) => `<tr><th>${k}</th><td>${escapeHtml(v)}</td></tr>`).join("");
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Set-Cookie": outcome.cookies,
+  });
+  res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BeaverParty sign-in test</title><link rel="stylesheet" href="/style.css"></head>
+<body><main><h1>Sign-in test</h1>
+<p>This is what Petrock sent. It's shown because DEBUG_SHOW_IDENTITY=1 and isn't saved anywhere. Turn it off before real users sign in.</p>
+<table>${rows}</table>
+<p><a class="button" href="${outcome.location}">Continue</a></p></main></body></html>`);
+}
+
 // Handles /auth/* and /api/me. Returns true if it handled the request.
 async function handle(config, req, res, url) {
   const isAuthRoute = url.pathname.startsWith("/auth/") || url.pathname === "/api/me";
@@ -83,28 +131,17 @@ async function handle(config, req, res, url) {
       return true;
     }
 
-    // Steps 9-12 of figure 2: non-students are turned away with nothing
+    // Steps 9-16 of figure 2: non-students are turned away with nothing
     // stored; for students we keep only the anon ID and drop email and name.
-    if (!config.allowedAffiliations.includes(person.affiliation)) {
-      redirect(res, "/students-only.html", [clearLogin]);
-      return true;
+    const outcome = decide(config, person);
+    outcome.cookies.unshift(clearLogin);
+    if (config.debugShowIdentity) {
+      // Test-only: show what Petrock sent. Shown once, never stored.
+      debugPage(res, person, outcome);
+    } else {
+      redirect(res, outcome.location, outcome.cookies);
     }
-    const anonId = anonIdFor(config, person.email);
     person = null;
-
-    const existing = accounts.find(anonId);
-    if (existing && existing.banned) {
-      redirect(res, "/banned.html", [clearLogin]);
-      return true;
-    }
-    accounts.findOrCreate(anonId);
-
-    const maxAgeSeconds = Math.round(config.sessionDays * 24 * 3600);
-    const session = sign(config.sessionSecret, { anonId, exp: Date.now() + maxAgeSeconds * 1000 });
-    redirect(res, "/", [
-      clearLogin,
-      cookie(SESSION_COOKIE, session, { maxAgeSeconds, secure: config.secureCookies }),
-    ]);
     return true;
   }
 

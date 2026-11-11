@@ -45,6 +45,9 @@ function loadConfig(env = process.env) {
     allowedAffiliations: (env.ALLOWED_AFFILIATIONS || "student")
       .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
     sessionDays: Number(env.SESSION_DAYS || 7),
+    // Test-only: after login, show the email, name, and affiliation Petrock
+    // sent. Never turn this on where real users sign in.
+    debugShowIdentity: env.DEBUG_SHOW_IDENTITY === "1",
   };
 
   const missing = ["PETROCK_CLIENT_ID", "PETROCK_CLIENT_SECRET", "ANON_ID_KEY", "SESSION_SECRET"]

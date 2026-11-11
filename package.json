@@ -1,0 +1,10 @@
+{
+  "name": "beaverparty",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Campus gaming app for MIT students (6.1850 team project)",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "start": "node server/index.js"
+  }
+}

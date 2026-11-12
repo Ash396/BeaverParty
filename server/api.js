@@ -17,6 +17,8 @@
 //   POST /api/friends                     -> {username} send a request (or accept theirs)
 //   POST /api/friends/accept | remove     -> {username} accept; or decline, cancel, unfriend
 //   PUT  /api/status                     -> {invisible} appear offline to everyone, or not
+//   GET  /api/heatmap?game=               -> players by day and hour (game omitted = all games)
+//   PUT  /api/heatmap/opt-in              -> {optIn} count me in the heat map, or not
 //   POST /api/account/delete              -> {confirm: username} delete your account
 //   GET  /api/blocks                      -> usernames you've blocked
 //   PUT | DELETE /api/blocks/:username    -> block or unblock someone
@@ -37,6 +39,7 @@ const db = require("./db");
 
 const endorsements = require("./endorsements");
 const blocks = require("./blocks");
+const heatmap = require("./heatmap");
 
 // Tell everyone signed in when someone appears or disappears, so dots update
 // live. Not people they have a block with, either way.
@@ -157,7 +160,14 @@ async function handle(config, req, res, url) {
       if (!profiles.getOwn(anonId)) throw new profiles.ValidationError("Create your profile first.");
       if (typeof body.invisible !== "boolean") throw new profiles.ValidationError("invisible must be true or false.");
       presence.setInvisible(anonId, body.invisible);
+      if (body.invisible) heatmap.forget(anonId);
       json(res, 200, { invisible: body.invisible });
+    } else if (req.method === "GET" && p === "/api/heatmap") {
+      json(res, 200, { ...heatmap.grid(url.searchParams.get("game") || heatmap.ALL), optedIn: heatmap.isOptedIn(anonId) });
+    } else if (req.method === "PUT" && p === "/api/heatmap/opt-in") {
+      if (typeof body.optIn !== "boolean") throw new profiles.ValidationError("optIn must be true or false.");
+      if (!heatmap.setOptIn(anonId, body.optIn)) throw new profiles.ValidationError("Create your profile first.");
+      json(res, 200, { optedIn: body.optIn });
     } else if (req.method === "POST" && p === "/api/account/delete") {
       // You must type your username to confirm (or "delete" if you have no profile).
       const own = profiles.getOwn(anonId);
@@ -167,6 +177,7 @@ async function handle(config, req, res, url) {
       }
       const wasOnline = presence.isOnline(anonId);
       deleteAccount(anonId);
+      heatmap.forget(anonId);
       events.kickEverywhere(anonId);
       presence.forget(anonId);
       if (wasOnline && own) events.publish("lobbies", "presence", { username: own && own.username, online: false });

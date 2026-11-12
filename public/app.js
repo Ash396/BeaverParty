@@ -41,6 +41,7 @@ function showPage() {
   if (target === "friends") loadFriends();
   if (target === "user") loadUser(decodeURIComponent(arg || ""));
   if (target === "moderation") loadModeration();
+  if (target === "heatmap") loadHeatmap();
 }
 
 // ---- My profile ----
@@ -737,6 +738,67 @@ fetch("/api/me")
     });
   })
   .catch(() => location.replace("/"));
+
+// ---- Heat map ----
+
+const HOUR_LABELS = { 0: "12a", 6: "6a", 12: "12p", 18: "6p" };
+const hourName = (h) => `${h % 12 || 12} ${h < 12 ? "AM" : "PM"}`;
+const DAY_NAMES = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+const players = (v) => { const n = Math.max(1, Math.round(v)); return `${n} player${n === 1 ? "" : "s"}`; };
+
+async function loadHeatmap() {
+  const form = document.getElementById("heatmap-form");
+  const select = form.elements.game;
+  let data;
+  try {
+    data = await api("GET", `/api/heatmap?game=${encodeURIComponent(select.value || "*")}`);
+  } catch (err) { return showError("heatmap-error", err); }
+  if (select.options.length === 0) {
+    for (const g of data.games) select.append(el("option", { value: g, textContent: g === "*" ? "All games" : g }));
+  }
+  select.value = data.game;
+  document.getElementById("heatmap-optin").checked = data.optedIn;
+  for (const node of document.querySelectorAll(".hm-k")) node.textContent = data.k;
+
+  const values = data.cells.flat().filter((v) => v !== null);
+  const max = Math.max(0, ...values);
+  const level = (v) => (v === null ? 0 : Math.max(1, Math.ceil((v / max) * 4)));
+  const gameName = data.game === "*" ? "all games" : data.game;
+
+  const grid = document.getElementById("heatmap-grid");
+  grid.ariaLabel = `Average players in lobbies for ${gameName} by day and hour. A list of the busiest times follows.`;
+  const cells = [el("span")];
+  for (let h = 0; h < 24; h++) cells.push(el("span", { className: "hm-hour", textContent: HOUR_LABELS[h] || "" }));
+  data.days.forEach((day, d) => {
+    cells.push(el("span", { className: "hm-day", textContent: day }));
+    data.cells[d].forEach((v, h) => {
+      const label = `${DAY_NAMES[day]} ${hourName(h)}: ${v === null ? "not enough players to show" : `about ${players(v)}`}`;
+      cells.push(el("span", { className: `hm-cell hm-${level(v)}`, title: label }));
+    });
+  });
+  grid.replaceChildren(...cells);
+
+  const busiest = data.cells.flatMap((row, d) => row.map((v, h) => ({ v, d, h })))
+    .filter((c) => c.v !== null).sort((a, b) => b.v - a.v).slice(0, 3);
+  document.getElementById("heatmap-empty").hidden = values.length > 0;
+  document.getElementById("heatmap-summary").textContent = busiest.length
+    ? `Busiest: ${busiest.map((c) => `${DAY_NAMES[data.days[c.d]]} ${hourName(c.h)} (about ${players(c.v)})`).join(", ")}.`
+    : "";
+  document.getElementById("heatmap-note").textContent = data.weeks
+    ? `Averaged over the last ${data.weeks === 1 ? "week" : `${data.weeks} weeks`}. The current hour isn't shown.`
+    : "";
+}
+
+document.getElementById("heatmap-form").addEventListener("change", () => loadHeatmap());
+document.getElementById("heatmap-optin").addEventListener("change", async (e) => {
+  showError("heatmap-error", null);
+  try {
+    await api("PUT", "/api/heatmap/opt-in", { optIn: e.target.checked });
+  } catch (err) {
+    e.target.checked = !e.target.checked;
+    showError("heatmap-error", err);
+  }
+});
 
 window.addEventListener("hashchange", showPage);
 

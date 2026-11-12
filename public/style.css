@@ -10,6 +10,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { font-family: var(--font); margin: 0; background: var(--bg); color: var(--text); }
 main { max-width: 640px; margin: 4rem auto; padding: 0 16px; }
 .button, button { display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--accent); background: var(--accent); color: #fff; text-decoration: none; font: inherit; cursor: pointer; border-radius: 4px; }
@@ -38,3 +39,17 @@ th, td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; border-bottom: 1px s
   .sidebar nav a { padding: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
   .sidebar form { margin-top: 0; }
 }
+
+/* Forms */
+.form label { display: block; margin: 0.75rem 0; }
+.form input:not([type="checkbox"]), .form select { display: block; width: 100%; max-width: 360px; padding: 0.4rem; font: inherit; border: 1px solid var(--border); border-radius: 4px; margin-top: 0.25rem; }
+.form fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 1rem 0; padding: 0.5rem 1rem; }
+.game-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.game-row:last-child { border-bottom: none; }
+.game-row label { margin: 0; flex: 1 1 200px; display: flex; gap: 0.5rem; align-items: center; }
+.game-row input[type="text"] { flex: 1 1 120px; max-width: 160px; margin: 0; }
+.small { font-size: 0.9rem; }
+.error { color: var(--accent); }
+.notice { background: var(--sidebar-bg); border-left: 4px solid var(--accent); padding: 0.5rem 0.75rem; }
+.details dt { font-weight: bold; margin-top: 0.75rem; }
+.details dd { margin: 0.25rem 0 0; }

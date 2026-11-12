@@ -146,7 +146,7 @@ function seats(lobby) {
     const seat = el("span", { className: i < lobby.members.length ? "seat filled" : "seat" });
     if (i < lobby.members.length) {
       seat.title = lobby.members[i];
-      seat.append(beaverSvg(lobby.avatars[i], 30));
+      seat.append(beaverSvg(lobby.avatars[i], 38));
     }
     row.append(seat);
   }

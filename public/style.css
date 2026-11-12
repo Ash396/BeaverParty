@@ -147,7 +147,7 @@ button.choice[aria-pressed="true"] { border-color: var(--primary); }
 .user-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .user-head h1 { margin: 0; }
 .seats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
-.seat { width: 38px; height: 38px; border-radius: 50%; border: 2px dashed var(--border); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.seat { width: 46px; height: 46px; border-radius: 50%; border: 2px dashed var(--border); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
 .seat.filled { border: 2px solid var(--primary); background: var(--surface-2); }
 
 /* Delete account */

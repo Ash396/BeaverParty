@@ -8,9 +8,11 @@
 //   GET  /api/lobbies/:id                 -> lobby details (more for members)
 //   POST /api/lobbies/:id/join | leave | close
 //   POST /api/lobbies/:id/messages        -> send a chat message
-//   GET  /api/events?lobby=:id            -> live updates (Server-Sent Events)
+//   GET  /api/events?lobby=:id            -> live updates (Server-Sent Events); having
+//                                            this open is what makes you show as online
 //   GET  /api/endorsements                -> recently closed lobbies you can endorse from
 //   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
+//   PUT  /api/status                     -> {invisible} appear offline to everyone, or not
 //   POST /api/account/delete              -> {confirm: username} delete your account
 //   GET  /api/blocks                      -> usernames you've blocked
 //   PUT | DELETE /api/blocks/:username    -> block or unblock someone
@@ -26,8 +28,18 @@ const { cookie } = require("./session");
 const profiles = require("./profiles");
 const lobbies = require("./lobbies");
 const events = require("./events");
+const presence = require("./presence");
+const db = require("./db");
+
 const endorsements = require("./endorsements");
 const blocks = require("./blocks");
+
+// Tell everyone signed in when someone appears or disappears, so dots update
+// live. Not people they have a block with, either way.
+presence.setListener((anonId, online) => {
+  const row = db.get().prepare("SELECT username FROM profiles WHERE anon_id = ?").get(anonId);
+  if (row) events.publish("lobbies", "presence", { username: row.username, online }, blocks.related(anonId));
+});
 const moderation = require("./moderation");
 const { currentAnonId } = require("./auth");
 
@@ -88,8 +100,11 @@ async function handle(config, req, res, url) {
     } else if (req.method === "GET" && p.startsWith("/api/profiles/")) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
       if (profile) {
+        // Someone you have a block with (either way) always looks offline.
+        const blocked = profile.online && blocks.between(anonId, profiles.anonIdOf(profile.username));
         json(res, 200, { profile: {
           ...profile,
+          online: profile.online && !blocked,
           badges: endorsements.counts(profile.username),
           blockedByMe: blocks.list(anonId).includes(profile.username),
         } });
@@ -120,6 +135,11 @@ async function handle(config, req, res, url) {
       events.publish("lobbies", "changed");
       events.publish(`lobby:${id}`, "changed");
       json(res, 200, { lobby: lobbies.detail(anonId, id) });
+    } else if (req.method === "PUT" && p === "/api/status") {
+      if (!profiles.getOwn(anonId)) throw new profiles.ValidationError("Create your profile first.");
+      if (typeof body.invisible !== "boolean") throw new profiles.ValidationError("invisible must be true or false.");
+      presence.setInvisible(anonId, body.invisible);
+      json(res, 200, { invisible: body.invisible });
     } else if (req.method === "POST" && p === "/api/account/delete") {
       // You must type your username to confirm (or "delete" if you have no profile).
       const own = profiles.getOwn(anonId);
@@ -127,8 +147,11 @@ async function handle(config, req, res, url) {
       if (String(body.confirm || "").trim().toLowerCase() !== expected) {
         throw new profiles.ValidationError(own ? "Type your username to confirm." : 'Type "delete" to confirm.');
       }
+      const wasOnline = presence.isOnline(anonId);
       deleteAccount(anonId);
       events.kickEverywhere(anonId);
+      presence.forget(anonId);
+      if (wasOnline && own) events.publish("lobbies", "presence", { username: own && own.username, online: false });
       events.publish("lobbies", "changed");
       res.writeHead(200, {
         "Content-Type": "application/json",
@@ -179,6 +202,8 @@ async function handle(config, req, res, url) {
       } else {
         if (lobbyId) channels.push(`lobby:${lobbyId}`);
         events.subscribe(res, anonId, channels);
+        presence.connected(anonId);
+        res.on("close", () => presence.disconnected(anonId));
       }
     } else {
       json(res, 404, { error: "Not found." });

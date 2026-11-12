@@ -117,6 +117,7 @@ async function handle(config, req, res, url) {
       isModerator: Boolean(account && account.isModerator),
       username: profile ? profile.username : null,
       warning: anonId ? moderation.pendingWarning(anonId) : null,
+      invisible: Boolean(profile && profile.invisible),
     });
     return true;
   }

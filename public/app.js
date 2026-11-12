@@ -104,6 +104,8 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
     });
     const firstTime = !me.username;
     me.username = profile.username;
+    me.invisible = profile.invisible;
+    renderMyStatus();
     error.hidden = true;
     if (firstTime) {
       history.replaceState(null, "", "#lobbies");
@@ -226,6 +228,50 @@ function userLink(username) {
   return el("a", { href: `#user/${encodeURIComponent(username)}`, textContent: username });
 }
 
+// ---- Online status ----
+
+// A dot that live "presence" events keep up to date. Invisible students
+// come through as offline, same as if they had the app closed.
+function presenceDot(username, online) {
+  const dot = el("span", { className: "presence", dataset: { user: username || "" } });
+  setDot(dot, online);
+  return dot;
+}
+
+function setDot(dot, online) {
+  dot.classList.toggle("on", online);
+  dot.title = online ? "Online" : "Offline";
+  dot.setAttribute("role", "img");
+  dot.setAttribute("aria-label", dot.title);
+}
+
+function onPresence({ username, online }) {
+  if (!username) return;
+  for (const dot of document.querySelectorAll(`.presence[data-user="${CSS.escape(username)}"]`)) setDot(dot, online);
+  const status = document.getElementById("user-status");
+  if (status.dataset.user === username) status.textContent = online ? "Online now" : "Offline";
+}
+
+function renderMyStatus() {
+  const button = document.getElementById("status-toggle");
+  button.hidden = !me.username;
+  const label = me.invisible ? "Invisible" : "Online";
+  button.replaceChildren(el("span", { className: me.invisible ? "presence" : "presence on", ariaHidden: "true" }),
+    el("span", { className: "status-label", textContent: label }));
+  button.ariaLabel = `Status: ${label}`;
+  button.title = me.invisible
+    ? "Everyone sees you as offline. Click to show as online."
+    : "Others can see you're online. Click to go invisible.";
+}
+
+document.getElementById("status-toggle").addEventListener("click", async () => {
+  try {
+    const { invisible } = await api("PUT", "/api/status", { invisible: !me.invisible });
+    me.invisible = invisible;
+    renderMyStatus();
+  } catch (err) { alert(err.message); }
+});
+
 function showError(id, err) {
   const node = document.getElementById(id);
   node.textContent = err ? err.message : "";
@@ -240,6 +286,7 @@ function connect() {
   stream = new EventSource(myLobbyId ? `/api/events?lobby=${myLobbyId}` : "/api/events");
   stream.addEventListener("changed", () => loadLobbies());
   stream.addEventListener("message", (e) => addMessage(JSON.parse(e.data)));
+  stream.addEventListener("presence", (e) => onPresence(JSON.parse(e.data)));
 }
 
 async function loadLobbies() {
@@ -286,7 +333,7 @@ function renderList(list) {
       } catch (err) { showError("join-error", err); }
     });
     const members = el("p", { className: "small" }, "Players: ");
-    lobby.members.forEach((m, i) => members.append(i ? ", " : "", userLink(m)));
+    lobby.members.forEach((m, i) => members.append(i ? ", " : "", presenceDot(m, lobby.online[i]), userLink(m)));
     return el("div", { className: "lobby-card" },
       el("div", {}, el("h3", { textContent: lobby.game }), el("p", { className: "muted", textContent: describe(lobby) }), seats(lobby), members),
       join);
@@ -300,7 +347,7 @@ async function renderMyLobby() {
   document.getElementById("lobby-meta").textContent = `Hosted by ${lobby.host} · ${describe(lobby)}`;
   document.getElementById("lobby-seats").replaceWith(Object.assign(seats(lobby), { id: "lobby-seats" }));
   document.getElementById("lobby-roster").replaceChildren(...lobby.roster.map((r) => {
-    const li = el("li", {}, beaverSvg(r.avatar, 28), userLink(r.username));
+    const li = el("li", {}, beaverSvg(r.avatar, 28), presenceDot(r.username, r.online), userLink(r.username));
     if (r.isModerator) li.append(modBadge());
     if (r.inGameName) li.append(` (in game: ${r.inGameName})`);
     if (r.blocked) li.append(el("span", { className: "muted small", textContent: " blocked, chat hidden" }));
@@ -434,6 +481,9 @@ async function loadUser(username) {
   document.getElementById("user-mod").hidden = true;
   document.getElementById("user-actions").hidden = true;
   document.getElementById("user-action-note").hidden = true;
+  const status = document.getElementById("user-status");
+  status.textContent = "";
+  status.dataset.user = "";
   missing.hidden = true;
   try {
     const { profile } = await api("GET", `/api/profiles/${encodeURIComponent(username)}`);
@@ -453,6 +503,8 @@ async function loadUser(username) {
     note.hidden = !profile.blockedByMe;
     note.textContent = "You blocked this player. They aren't told.";
     document.getElementById("user-avatar").replaceChildren(beaverSvg(profile.avatar, 72));
+    status.dataset.user = profile.username;
+    status.textContent = profile.online ? "Online now" : "Offline";
     const rows = [["Games", profile.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ")]];
     const earned = (profile.badges || []).filter((b) => b.count > 0);
     rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);
@@ -567,7 +619,12 @@ fetch("/api/me")
     me = data;
     document.getElementById("nav-moderation").hidden = !me.isModerator;
     showWarning(me.warning);
-    return api("GET", "/api/catalog").then((c) => { catalog = c; showPage(); });
+    return api("GET", "/api/catalog").then((c) => {
+      catalog = c;
+      showPage();
+      renderMyStatus();
+      if (me.username) connect(); // having the app open on any page is what shows you as online
+    });
   })
   .catch(() => location.replace("/"));
 

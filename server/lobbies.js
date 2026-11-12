@@ -7,6 +7,7 @@ const db = require("./db");
 const { GAMES } = require("./catalog");
 const { ValidationError, avatarOf } = require("./profiles");
 const blocks = require("./blocks");
+const presence = require("./presence");
 
 const VIBES = ["casual", "competitive"];
 const MAX_SLOTS = 10;
@@ -108,6 +109,7 @@ function summary(lobby) {
     host: usernameOf(lobby.host_anon_id),
     members: members.map(usernameOf),
     avatars: members.map(avatarOf),
+    online: members.map(presence.isOnline),
     createdAt: lobby.created_at,
   };
 }
@@ -137,9 +139,11 @@ function detail(anonId, id) {
   if (out.isMember) {
     const ign = db.get().prepare("SELECT in_game_name FROM profile_games WHERE anon_id = ? AND game = ?");
     const mine = blocks.blockedBy(anonId);
+    const related = blocks.related(anonId);
     out.roster = memberIds(id).map((m) => ({
       username: usernameOf(m),
       avatar: avatarOf(m),
+      online: presence.isOnline(m) && !related.has(m), // blocks always look offline
       inGameName: (ign.get(m, lobby.game) || {}).in_game_name || null,
       isModerator: isModerator(m),
       blocked: mine.has(m),

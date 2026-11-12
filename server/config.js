@@ -45,6 +45,8 @@ function loadConfig(env = process.env) {
     allowedAffiliations: (env.ALLOWED_AFFILIATIONS || "student")
       .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
     sessionDays: Number(env.SESSION_DAYS || 7),
+    // SQLite database file. On Hyades this must be on a volume.
+    dbPath: env.DB_PATH || path.join(__dirname, "..", "data", "beaverparty.db"),
     // Test-only: after login, show the email, name, and affiliation Petrock
     // sent. Never turn this on where real users sign in.
     debugShowIdentity: env.DEBUG_SHOW_IDENTITY === "1",

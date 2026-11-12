@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BeaverParty</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">BeaverParty</div>
+      <nav>
+        <a href="#lobbies">Lobbies</a>
+        <a href="#profile">My profile</a>
+        <a href="#heatmap">Heat map</a>
+        <a href="#moderation" id="nav-moderation" hidden>Moderation</a>
+      </nav>
+      <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+    </aside>
+
+    <section class="content">
+      <!-- One section per page; app.js shows the one named in the URL after #. -->
+      <div data-page="lobbies">
+        <h1>Lobbies</h1>
+        <p class="muted">Coming soon: browse and filter open lobbies by game, open slots, vibe, and voice; create your own.</p>
+      </div>
+      <div data-page="profile" hidden>
+        <h1>My profile</h1>
+        <p class="muted">Coming soon: your username and games (always shown), plus optional real name, dorm, ranks, and in-game names.</p>
+      </div>
+      <div data-page="heatmap" hidden>
+        <h1>Heat map</h1>
+        <p class="muted">Coming soon: when students are playing, by game and time.</p>
+      </div>
+      <div data-page="moderation" hidden>
+        <h1>Moderation</h1>
+        <p class="muted">Coming soon: the queue of reports with their saved chat.</p>
+      </div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

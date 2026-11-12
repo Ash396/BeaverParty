@@ -6,7 +6,7 @@ So far it has a tiny web server with MIT Touchstone sign-in through SIPB's [Petr
 
 ## Run it locally
 
-You need [Node.js](https://nodejs.org/) 18 or newer.
+You need [Node.js](https://nodejs.org/) 22.13 or newer (it has SQLite built in).
 
 ```sh
 npm start
@@ -24,7 +24,18 @@ Then open http://localhost:3000. A health check is at http://localhost:3000/api/
 
 To check what Petrock sends, add `DEBUG_SHOW_IDENTITY=1` to `.env`. After login you'll see your email, name, affiliation, and anonymous ID on a one-time page. Nothing is saved, but leave it off anywhere real users sign in.
 
-Sign-in follows figure 2 of the proposal. The server exchanges Petrock's one-time code for tokens itself, checks the ID token's signature, and lets in only `student` affiliations. It keeps only `HMAC(ANON_ID_KEY, email)` as the account ID, drops the email and name, refuses banned accounts, and sets a 7-day session cookie. Accounts live in memory until we pick a database.
+Sign-in follows figure 2 of the proposal. The server exchanges Petrock's one-time code for tokens itself, checks the ID token's signature, and lets in only `student` affiliations. It keeps only `HMAC(ANON_ID_KEY, email)` as the account ID, drops the email and name, refuses banned accounts, and sets a 7-day session cookie. Accounts are stored in the SQLite database at `data/beaverparty.db` (gitignored). Delete that file to start fresh.
+
+### Moderators
+
+Moderators see the Moderation page. To make someone a moderator, run this with the same `.env` as the server:
+
+```sh
+npm run set-moderator -- someone@mit.edu
+npm run set-moderator -- someone@mit.edu --remove
+```
+
+The email is only used to compute the anonymous ID and isn't stored.
 
 ### Tests
 
@@ -46,22 +57,26 @@ First-time setup:
 2. Log in to Hyades: `kinit KERB@ATHENA.MIT.EDU`, then `ssh -K KERB@hyades.mit.edu`.
 3. Create the app. If a test app named `beaverparty` already exists, first run `delete beaverparty`.
    `create beaverparty ghcr.io/ash396/beaverparty:latest 3000`
-4. Run `edit` and add the settings under `"envs"` for `beaverparty`. Use the same values as your `.env`, but set `BASE_URL` to `https://beaverparty.sipb.cloud`. Leave out `DEBUG_SHOW_IDENTITY`.
+4. Run `edit` and, for `beaverparty`, add `"volumes": { "beaverparty_db": "/data" }` so the database survives restarts, then add the settings under `"envs"`. Use the same values as your `.env`, but set `BASE_URL` to `https://beaverparty.sipb.cloud`. Leave out `DEBUG_SHOW_IDENTITY`.
 5. `start beaverparty`. Check `status beaverparty` and `logs beaverparty`.
 
 To ship a new version later, merge to `main`, wait for CI to go green, then run `update` on Hyades (Hyades also updates images daily).
 
-Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a redirect URL. Accounts are kept in memory for now, so a restart forgets them (and any bans) until we add a database.
+Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a redirect URL. The database is the file `/data/beaverparty.db` on the `beaverparty_db` volume. Back it up with `expvol beaverparty_db`.
 
 ## Layout
 
 ```
 public/     The web pages (HTML, CSS, JS) the browser loads
+  index.html  landing page for signed-out visitors
+  app.html    the app: sidebar (bottom tabs on phones) + Lobbies, My profile, Heat map, Moderation
+  style.css   shared styles; colors and font are variables at the top
 server/     The Node.js server
   auth.js     sign-in routes (/auth/login, /auth/callback, /auth/logout, /api/me)
   oidc.js     talks to Petrock: code exchange, ID token check, userinfo
   session.js  signed cookies
-  accounts.js accounts by anonymous ID (in memory for now)
+  db.js       SQLite database and table definitions (all keyed by anonymous ID)
+  accounts.js accounts: banned and moderator flags
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```

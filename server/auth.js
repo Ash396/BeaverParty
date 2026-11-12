@@ -7,6 +7,7 @@
 const crypto = require("node:crypto");
 const oidc = require("./oidc");
 const accounts = require("./accounts");
+const profiles = require("./profiles");
 const { sign, unsign, parseCookies, cookie } = require("./session");
 
 const LOGIN_COOKIE = "bp_login";
@@ -23,7 +24,7 @@ function currentAnonId(config, req) {
   const session = unsign(config.sessionSecret, parseCookies(req.headers.cookie)[SESSION_COOKIE]);
   if (!session) return null;
   const account = accounts.find(session.anonId);
-  if (account && account.banned) return null;
+  if (!account || account.banned) return null;
   return session.anonId;
 }
 
@@ -93,10 +94,12 @@ async function handle(config, req, res, url) {
   if (url.pathname === "/api/me") {
     const anonId = currentAnonId(config, req);
     const account = anonId && accounts.find(anonId);
+    const profile = anonId && profiles.getOwn(anonId);
     json(res, 200, {
       authEnabled: config.authEnabled,
       signedIn: Boolean(anonId),
       isModerator: Boolean(account && account.isModerator),
+      username: profile ? profile.username : null,
     });
     return true;
   }

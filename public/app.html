@@ -27,7 +27,31 @@
       </div>
       <div data-page="profile" hidden>
         <h1>My profile</h1>
-        <p class="muted">Coming soon: your username and games (always shown), plus optional real name, dorm, ranks, and in-game names.</p>
+        <p id="setup-note" class="notice" hidden>Welcome! Pick a username and the games you play to get started.</p>
+        <form id="profile-form" class="form">
+          <label>Username <span class="muted">(always shown)</span>
+            <input name="username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_\-]+" autocomplete="off">
+          </label>
+          <fieldset>
+            <legend>Games you play <span class="muted">(always shown)</span></legend>
+            <p class="muted small">Rank is optional and shown on your profile. In-game name is only shown to people in your lobbies for that game.</p>
+            <div id="game-list"></div>
+          </fieldset>
+          <fieldset>
+            <legend>Optional <span class="muted">(leave blank to hide)</span></legend>
+            <label>Real name <input name="realName" maxlength="60" autocomplete="off"></label>
+            <label>Dorm <select name="dorm"><option value="">Don't show</option></select></label>
+          </fieldset>
+          <p id="profile-error" class="error" hidden></p>
+          <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
+          <p id="preview-link" hidden><a href="#">See what other students see</a></p>
+        </form>
+      </div>
+      <div data-page="user" hidden>
+        <p><a href="#profile" id="back-link">&larr; Back</a></p>
+        <h1 id="user-name"></h1>
+        <dl id="user-details" class="details"></dl>
+        <p id="user-missing" hidden>No student with that username.</p>
       </div>
       <div data-page="heatmap" hidden>
         <h1>Heat map</h1>

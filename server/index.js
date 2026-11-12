@@ -6,6 +6,7 @@ const path = require("node:path");
 const { loadConfig } = require("./config");
 const auth = require("./auth");
 const db = require("./db");
+const api = require("./api");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript" };
@@ -16,6 +17,7 @@ function createServer(config) {
 
     try {
       if (await auth.handle(config, req, res, url)) return;
+      if (await api.handle(config, req, res, url)) return;
     } catch (err) {
       console.error(err);
       res.writeHead(500);

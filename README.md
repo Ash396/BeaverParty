@@ -77,6 +77,9 @@ server/     The Node.js server
   session.js  signed cookies
   db.js       SQLite database and table definitions (all keyed by anonymous ID)
   accounts.js accounts: banned and moderator flags
+  profiles.js profiles: username, games, opt-in real name and dorm
+  catalog.js  fixed game and dorm lists (games from the team survey)
+  api.js      JSON API for signed-in students (/api/profile, /api/profiles/:username, /api/catalog)
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```

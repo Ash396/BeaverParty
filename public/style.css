@@ -53,3 +53,23 @@ th, td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; border-bottom: 1px s
 .notice { background: var(--sidebar-bg); border-left: 4px solid var(--accent); padding: 0.5rem 0.75rem; }
 .details dt { font-weight: bold; margin-top: 0.75rem; }
 .details dd { margin: 0.25rem 0 0; }
+
+/* Lobbies */
+button.secondary { background: var(--bg); color: var(--text); border-color: var(--border); }
+.badge { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--sidebar-bg); border: 1px solid var(--border); text-transform: uppercase; }
+.create-box { margin: 1rem 0; border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 1rem; }
+.create-box summary { cursor: pointer; font-weight: bold; }
+.form label.inline { display: flex; gap: 0.5rem; align-items: center; }
+.filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+.filters select { padding: 0.35rem; font: inherit; }
+.lobby-list { display: grid; gap: 0.75rem; }
+.lobby-card { border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.lobby-card h3 { margin: 0 0 0.25rem; }
+.lobby-card p { margin: 0.15rem 0; }
+.roster { padding-left: 1.25rem; }
+.chat-log { border: 1px solid var(--border); border-radius: 4px; height: 280px; overflow-y: auto; padding: 0.5rem 0.75rem; background: var(--bg); }
+.chat-log p { margin: 0.3rem 0; overflow-wrap: anywhere; }
+.chat-log .who { font-weight: bold; margin-right: 0.4rem; }
+.chat-log .when { color: var(--muted); font-size: 0.8rem; margin-left: 0.4rem; }
+.chat-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.chat-form input { flex: 1; padding: 0.45rem; font: inherit; border: 1px solid var(--border); border-radius: 4px; }

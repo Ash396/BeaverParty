@@ -79,7 +79,9 @@ server/     The Node.js server
   accounts.js accounts: banned and moderator flags
   profiles.js profiles: username, games, opt-in real name and dorm
   catalog.js  fixed game and dorm lists (games from the team survey)
-  api.js      JSON API for signed-in students (/api/profile, /api/profiles/:username, /api/catalog)
+  api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
+  lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
+  events.js   live updates to browsers over Server-Sent Events
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```

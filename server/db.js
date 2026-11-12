@@ -91,6 +91,12 @@ const MIGRATIONS = [
     resolved_at      TEXT
   );
   `,
+  // 2: indexes for lobby lookups.
+  `
+  CREATE INDEX lobbies_state ON lobbies(state);
+  CREATE INDEX lobby_members_anon ON lobby_members(anon_id);
+  CREATE INDEX messages_lobby ON messages(lobby_id, id);
+  `,
 ];
 
 let db = null;

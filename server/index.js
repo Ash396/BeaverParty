@@ -48,6 +48,13 @@ function createServer(config) {
 if (require.main === module) {
   const config = loadConfig();
   db.open(config.dbPath);
+  // Delete old lobby chat now and every hour.
+  const cleanup = () => {
+    const n = require("./lobbies").deleteOldChats(config.chatRetentionDays);
+    if (n) console.log(`Deleted ${n} old chat messages.`);
+  };
+  cleanup();
+  setInterval(cleanup, 3600_000).unref();
   if (!config.authEnabled) {
     console.warn(`Sign-in is off. Missing: ${config.missing.join(", ")}. See .env.example.`);
   }

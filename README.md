@@ -89,7 +89,7 @@ Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a
 ```
 public/     The web pages (HTML, CSS, JS) the browser loads
   index.html  landing page for signed-out visitors
-  app.html    the app: sidebar (bottom tabs on phones) + Lobbies, My profile, Heat map, Moderation
+  app.html    the app: sidebar (bottom tabs on phones) + Lobbies, Friends, Heat map, Moderation; My profile sits at the bottom
   style.css   shared styles; the team palette and dark/light colors are variables at the top
   theme.js    dark mode by default, with a light mode toggle remembered in the browser
   avatar.js   pixel beaver avatars (fur color + accessory), drawn as SVG
@@ -106,6 +106,7 @@ server/     The Node.js server
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
   lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
   events.js   live updates to browsers over Server-Sent Events
+  friends.js  mutual friend requests, friends list, username search (3+ letters, prefix only)
   presence.js online/invisible status: online while the app is open, kept in memory only
   endorsements.js badges players give each other after a lobby closes
   keyservice.js the Key Service: holds ANON_ID_KEY, turns emails into anonymous IDs

@@ -12,6 +12,10 @@
 //                                            this open is what makes you show as online
 //   GET  /api/endorsements                -> recently closed lobbies you can endorse from
 //   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
+//   GET  /api/friends                     -> your friends (with online status) and requests
+//   GET  /api/friends/search?q=           -> up to 8 usernames starting with q (3+ characters)
+//   POST /api/friends                     -> {username} send a request (or accept theirs)
+//   POST /api/friends/accept | remove     -> {username} accept; or decline, cancel, unfriend
 //   PUT  /api/status                     -> {invisible} appear offline to everyone, or not
 //   POST /api/account/delete              -> {confirm: username} delete your account
 //   GET  /api/blocks                      -> usernames you've blocked
@@ -40,6 +44,7 @@ presence.setListener((anonId, online) => {
   const row = db.get().prepare("SELECT username FROM profiles WHERE anon_id = ?").get(anonId);
   if (row) events.publish("lobbies", "presence", { username: row.username, online }, blocks.related(anonId));
 });
+const friends = require("./friends");
 const moderation = require("./moderation");
 const { currentAnonId } = require("./auth");
 
@@ -101,12 +106,14 @@ async function handle(config, req, res, url) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
       if (profile) {
         // Someone you have a block with (either way) always looks offline.
-        const blocked = profile.online && blocks.between(anonId, profiles.anonIdOf(profile.username));
+        const otherId = profiles.anonIdOf(profile.username);
+        const blocked = blocks.between(anonId, otherId);
         json(res, 200, { profile: {
           ...profile,
           online: profile.online && !blocked,
           badges: endorsements.counts(profile.username),
           blockedByMe: blocks.list(anonId).includes(profile.username),
+          friend: friends.relation(anonId, otherId),
         } });
       }
       else json(res, 404, { error: "No such user." });
@@ -135,6 +142,17 @@ async function handle(config, req, res, url) {
       events.publish("lobbies", "changed");
       events.publish(`lobby:${id}`, "changed");
       json(res, 200, { lobby: lobbies.detail(anonId, id) });
+    } else if (req.method === "GET" && p === "/api/friends") {
+      json(res, 200, friends.list(anonId));
+    } else if (req.method === "GET" && p === "/api/friends/search") {
+      json(res, 200, { results: friends.search(anonId, url.searchParams.get("q")) });
+    } else if (req.method === "POST" && /^\/api\/friends(\/accept|\/remove)?$/.test(p)) {
+      const action = p.endsWith("/accept") ? "accept" : p.endsWith("/remove") ? "remove" : "request";
+      const { otherId, relation } = friends[action](anonId, body.username);
+      // Both lists change; the other student's page refreshes live.
+      if (otherId) events.publish(`user:${otherId}`, "friends");
+      events.publish(`user:${anonId}`, "friends");
+      json(res, 200, { relation });
     } else if (req.method === "PUT" && p === "/api/status") {
       if (!profiles.getOwn(anonId)) throw new profiles.ValidationError("Create your profile first.");
       if (typeof body.invisible !== "boolean") throw new profiles.ValidationError("invisible must be true or false.");
@@ -168,8 +186,13 @@ async function handle(config, req, res, url) {
       json(res, 200, { blocked: blocks.list(anonId) });
     } else if ((req.method === "PUT" || req.method === "DELETE") && blockMatch) {
       const username = decodeURIComponent(blockMatch[1]);
-      if (req.method === "PUT") blocks.block(anonId, username);
-      else blocks.unblock(anonId, username);
+      if (req.method === "PUT") {
+        blocks.block(anonId, username);
+        const otherId = profiles.anonIdOf(username);
+        friends.endBetween(anonId, otherId); // blocking ends a friendship or request
+        events.publish(`user:${otherId}`, "friends");
+        events.publish(`user:${anonId}`, "friends");
+      } else blocks.unblock(anonId, username);
       events.publish("lobbies", "changed");
       json(res, 200, { blocked: blocks.list(anonId) });
     } else if (req.method === "POST" && p === "/api/reports") {
@@ -195,7 +218,7 @@ async function handle(config, req, res, url) {
       moderation.unban(anonId, body.username);
       json(res, 200, { banned: moderation.bannedList(anonId) });
     } else if (req.method === "GET" && p === "/api/events") {
-      const channels = ["lobbies"];
+      const channels = ["lobbies", `user:${anonId}`];
       const lobbyId = Number(url.searchParams.get("lobby"));
       if (lobbyId && !lobbies.isMember(anonId, lobbyId)) {
         json(res, 403, { error: "Not a member." });

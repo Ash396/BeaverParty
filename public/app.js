@@ -1,6 +1,6 @@
 // App shell: checks sign-in, shows the page named after # in the URL, and
 // highlights it in the sidebar. New users must create a profile first.
-const PAGES = ["lobbies", "profile", "heatmap", "moderation", "user"];
+const PAGES = ["lobbies", "friends", "profile", "heatmap", "moderation", "user"];
 let me = { isModerator: false, username: null };
 let catalog = null;
 
@@ -32,12 +32,13 @@ function showPage() {
   if (target === "moderation" && !me.isModerator) target = "lobbies";
   if (!me.username) target = "profile"; // finish setup first
   for (const node of document.querySelectorAll("[data-page]")) node.hidden = node.dataset.page !== target;
-  for (const link of document.querySelectorAll(".sidebar nav a")) {
+  for (const link of document.querySelectorAll(".sidebar a[href^='#']")) {
     if (link.getAttribute("href") === `#${target}`) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
   }
   if (target === "lobbies") loadLobbies();
   if (target === "profile") loadProfile();
+  if (target === "friends") loadFriends();
   if (target === "user") loadUser(decodeURIComponent(arg || ""));
   if (target === "moderation") loadModeration();
 }
@@ -105,7 +106,9 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
     const firstTime = !me.username;
     me.username = profile.username;
     me.invisible = profile.invisible;
+    me.avatar = profile.avatar;
     renderMyStatus();
+    renderMe();
     error.hidden = true;
     if (firstTime) {
       history.replaceState(null, "", "#lobbies");
@@ -287,6 +290,12 @@ function connect() {
   stream.addEventListener("changed", () => loadLobbies());
   stream.addEventListener("message", (e) => addMessage(JSON.parse(e.data)));
   stream.addEventListener("presence", (e) => onPresence(JSON.parse(e.data)));
+  stream.addEventListener("friends", () => {
+    if (!document.querySelector('[data-page="friends"]').hidden) loadFriends();
+    else refreshFriendCount();
+    const user = document.querySelector('[data-page="user"]');
+    if (!user.hidden) loadUser(document.getElementById("user-name").textContent);
+  });
 }
 
 async function loadLobbies() {
@@ -469,6 +478,99 @@ function endorseRow(lobbyId, player, badges) {
   return row;
 }
 
+// ---- Friends ----
+
+// The sidebar chip: your avatar and username, linking to your profile.
+function renderMe() {
+  document.getElementById("me-avatar").replaceChildren(me.avatar ? beaverSvg(me.avatar, 28) : "");
+  document.getElementById("me-name").textContent = me.username || "My profile";
+}
+
+function setFriendCount(n) {
+  const badge = document.getElementById("friend-count");
+  badge.textContent = n;
+  badge.hidden = !n;
+  badge.ariaLabel = `${n} friend request${n === 1 ? "" : "s"}`;
+}
+
+async function refreshFriendCount() {
+  const { incoming } = await api("GET", "/api/friends");
+  setFriendCount(incoming.length);
+}
+
+async function friendAction(action, username) {
+  try {
+    const { relation } = await api("POST", action ? `/api/friends/${action}` : "/api/friends", { username });
+    showError("friend-error", null);
+    return relation;
+  } catch (err) {
+    showError("friend-error", err);
+    showError("user-friend-error", err);
+    return null;
+  }
+}
+
+function button(label, onClick, className = "") {
+  const b = el("button", { type: "button", textContent: label, className });
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+// One row in a list of people: avatar, (dot), name, then buttons.
+function personRow(p, buttons, showDot) {
+  return el("li", {},
+    beaverSvg(p.avatar, 32),
+    showDot ? presenceDot(p.username, p.online) : "",
+    userLink(p.username),
+    el("span", { className: "actions" }, ...buttons));
+}
+
+// Buttons for how you relate to someone; used in search and on profiles.
+function relationButtons(username, relation, after) {
+  const act = (action) => async () => { if ((await friendAction(action, username)) !== null) after(); };
+  if (relation === "friend") return [el("span", { className: "muted small", textContent: "Friends" })];
+  if (relation === "sent") return [el("span", { className: "muted small", textContent: "Requested" }), button("Cancel", act("remove"), "secondary")];
+  if (relation === "received") return [button("Accept", act("accept")), button("Decline", act("remove"), "secondary")];
+  return [button("Add friend", act(""))];
+}
+
+async function loadFriends() {
+  const { friends, incoming, outgoing } = await api("GET", "/api/friends");
+  setFriendCount(incoming.length);
+  const reload = () => { loadFriends(); runSearch(); };
+  const act = (action, username, confirmText) => async () => {
+    if (confirmText && !confirm(confirmText)) return;
+    if ((await friendAction(action, username)) !== null) reload();
+  };
+  document.getElementById("incoming-box").hidden = incoming.length === 0;
+  document.getElementById("incoming-list").replaceChildren(...incoming.map((p) =>
+    personRow(p, [button("Accept", act("accept", p.username)), button("Decline", act("remove", p.username), "secondary")])));
+  document.getElementById("friend-empty").hidden = friends.length > 0;
+  document.getElementById("friend-list").replaceChildren(...friends.map((p) =>
+    personRow(p, [button("Remove", act("remove", p.username, `Remove ${p.username} from your friends?`), "secondary")], true)));
+  document.getElementById("outgoing-box").hidden = outgoing.length === 0;
+  document.getElementById("outgoing-list").replaceChildren(...outgoing.map((p) =>
+    personRow(p, [button("Cancel", act("remove", p.username), "secondary")])));
+}
+
+let searchTimer = null;
+async function runSearch() {
+  const q = document.getElementById("friend-q").value.trim();
+  const list = document.getElementById("search-results");
+  const empty = document.getElementById("search-empty");
+  if (q.length < 3) { list.replaceChildren(); empty.hidden = true; return; }
+  const { results } = await api("GET", `/api/friends/search?q=${encodeURIComponent(q)}`);
+  if (document.getElementById("friend-q").value.trim() !== q) return; // typed more since
+  empty.hidden = results.length > 0;
+  list.replaceChildren(...results.map((p) =>
+    personRow(p, relationButtons(p.username, p.relation, () => { loadFriends(); runSearch(); }), p.relation === "friend")));
+}
+document.getElementById("friend-q").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(runSearch, 250);
+});
+document.getElementById("friend-search").addEventListener("submit", (e) => { e.preventDefault(); runSearch(); });
+
 // ---- Someone's public profile ----
 
 async function loadUser(username) {
@@ -478,6 +580,7 @@ async function loadUser(username) {
   name.textContent = username;
   details.replaceChildren();
   document.getElementById("user-avatar").replaceChildren();
+  document.getElementById("user-friend").replaceChildren();
   document.getElementById("user-mod").hidden = true;
   document.getElementById("user-actions").hidden = true;
   document.getElementById("user-action-note").hidden = true;
@@ -505,6 +608,11 @@ async function loadUser(username) {
     document.getElementById("user-avatar").replaceChildren(beaverSvg(profile.avatar, 72));
     status.dataset.user = profile.username;
     status.textContent = profile.online ? "Online now" : "Offline";
+    const isMe = profile.username === me.username;
+    const reload = () => { loadUser(profile.username); refreshFriendCount(); };
+    document.getElementById("user-friend").replaceChildren(
+      ...(isMe ? [] : relationButtons(profile.username, profile.friend, reload)),
+      el("span", { id: "user-friend-error", className: "error", hidden: true }));
     const rows = [["Games", profile.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ")]];
     const earned = (profile.badges || []).filter((b) => b.count > 0);
     rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);
@@ -623,9 +731,16 @@ fetch("/api/me")
       catalog = c;
       showPage();
       renderMyStatus();
+      renderMe();
+      setFriendCount(me.friendRequests || 0);
       if (me.username) connect(); // having the app open on any page is what shows you as online
     });
   })
   .catch(() => location.replace("/"));
 
 window.addEventListener("hashchange", showPage);
+
+// Profiles are opened from lobbies, friends, and search, so go back to wherever you were.
+document.getElementById("back-link").addEventListener("click", (e) => {
+  if (history.length > 1) { e.preventDefault(); history.back(); }
+});

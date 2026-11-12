@@ -138,6 +138,20 @@ const MIGRATIONS = [
     seen_at    TEXT
   );
   `,
+  // 6: friends (see friends.js). One row per pair: a pending request until
+  // the other student accepts it.
+  `
+  CREATE TABLE friends (
+    from_anon_id TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    to_anon_id   TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    accepted     INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    accepted_at  TEXT,
+    PRIMARY KEY (from_anon_id, to_anon_id),
+    CHECK (from_anon_id <> to_anon_id)
+  );
+  CREATE INDEX friends_to ON friends(to_anon_id);
+  `,
 ];
 
 let db = null;

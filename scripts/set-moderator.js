@@ -13,10 +13,15 @@ if (!email.includes("@")) {
   process.exit(1);
 }
 const config = loadConfig();
-if (!config.anonIdKey) {
-  console.error("ANON_ID_KEY is not set. Use the same value as the running server.");
+if (!config.anonIdKey && !config.keyServiceUrl) {
+  console.error("Set ANON_ID_KEY, or KEY_SERVICE_URL and KEY_SERVICE_TOKEN, like the running server.");
   process.exit(1);
 }
-db.open(config.dbPath);
-accounts.setModerator(anonIdFor(config, email), !remove);
-console.log(remove ? "Removed moderator." : "Added moderator.");
+anonIdFor(config, email).then((anonId) => {
+  db.open(config.dbPath);
+  accounts.setModerator(anonId, !remove);
+  console.log(remove ? "Removed moderator." : "Added moderator.");
+}).catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

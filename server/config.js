@@ -38,8 +38,13 @@ function loadConfig(env = process.env) {
     jwksUri: env.PETROCK_JWKS_URI || `${issuer}/oidc/jwks`,
     clientId: env.PETROCK_CLIENT_ID,
     clientSecret: env.PETROCK_CLIENT_SECRET,
-    // Key for anon ID = HMAC(key, email). Keep it separate from the database.
+    // Anon ID = HMAC(key, email). In production the key lives only in the
+    // Key Service: set KEY_SERVICE_URL and KEY_SERVICE_TOKEN and leave
+    // ANON_ID_KEY out of the web server. For local development, ANON_ID_KEY
+    // alone works.
     anonIdKey: env.ANON_ID_KEY,
+    keyServiceUrl: env.KEY_SERVICE_URL,
+    keyServiceToken: env.KEY_SERVICE_TOKEN,
     // Key that signs session cookies.
     sessionSecret: env.SESSION_SECRET,
     allowedAffiliations: (env.ALLOWED_AFFILIATIONS || "student")
@@ -54,7 +59,8 @@ function loadConfig(env = process.env) {
     debugShowIdentity: env.DEBUG_SHOW_IDENTITY === "1",
   };
 
-  const missing = ["PETROCK_CLIENT_ID", "PETROCK_CLIENT_SECRET", "ANON_ID_KEY", "SESSION_SECRET"]
+  const keyVars = env.KEY_SERVICE_URL ? ["KEY_SERVICE_TOKEN"] : ["ANON_ID_KEY"];
+  const missing = ["PETROCK_CLIENT_ID", "PETROCK_CLIENT_SECRET", ...keyVars, "SESSION_SECRET"]
     .filter((name) => !env[name]);
   config.authEnabled = missing.length === 0;
   config.missing = missing;

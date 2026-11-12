@@ -62,6 +62,18 @@ First-time setup:
 
 To ship a new version later, merge to `main`, wait for CI to go green, then run `update` on Hyades (Hyades also updates images daily).
 
+### Key Service (keeps the anonymous-ID key out of the web server)
+
+`server/keyservice.js` is the only part that knows `ANON_ID_KEY`. The web server sends it the email from Petrock and gets back the anonymous ID. So someone who gets the web server's settings and database still can't turn a kerb into an account. It runs from the same image, as a second Hyades app:
+
+1. Make a token: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+2. `create beaverparty-keys ghcr.io/ash396/beaverparty:latest 4000`
+3. `edit`. For `beaverparty-keys`, set envs `ROLE=keys`, `PORT=4000`, `ANON_ID_KEY` (the **same** value the web server has now, so every account keeps its ID), and `KEY_SERVICE_TOKEN` (the token).
+4. For `beaverparty`, add `KEY_SERVICE_URL=https://beaverparty-keys.sipb.cloud` and `KEY_SERVICE_TOKEN` (same token), then **remove** `ANON_ID_KEY`.
+5. `start beaverparty-keys`, then `restart beaverparty`. Sign in once to check.
+
+Without `KEY_SERVICE_URL`, the web server uses `ANON_ID_KEY` itself, which is fine on your laptop. The Key Service needs the token and answers at most 60 lookups a minute, so a stolen token can't be used to look up many kerbs quickly. Give `set-moderator` the same `KEY_SERVICE_URL` and token.
+
 Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a redirect URL. The database is the file `/data/beaverparty.db` on the `beaverparty_db` volume. Back it up with `expvol beaverparty_db`.
 
 ## Layout
@@ -70,7 +82,8 @@ Petrock must have `https://beaverparty.sipb.cloud/auth/callback` registered as a
 public/     The web pages (HTML, CSS, JS) the browser loads
   index.html  landing page for signed-out visitors
   app.html    the app: sidebar (bottom tabs on phones) + Lobbies, My profile, Heat map, Moderation
-  style.css   shared styles; colors and font are variables at the top
+  style.css   shared styles; the team palette and dark/light colors are variables at the top
+  theme.js    dark mode by default, with a light mode toggle remembered in the browser
 server/     The Node.js server
   auth.js     sign-in routes (/auth/login, /auth/callback, /auth/logout, /api/me)
   oidc.js     talks to Petrock: code exchange, ID token check, userinfo
@@ -83,10 +96,11 @@ server/     The Node.js server
   lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
   events.js   live updates to browsers over Server-Sent Events
   endorsements.js badges players give each other after a lobby closes
+  keyservice.js the Key Service: holds ANON_ID_KEY, turns emails into anonymous IDs
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). Auth, Profile, Lobby, and Endorsement are built. Still to come: moving the anonymous-ID key into its own Key Service, reports and moderation, and the heat map.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). Auth, Profile, Lobby, and Endorsement are built. The Key Service is built too. Still to come: reports and moderation, and the heat map.

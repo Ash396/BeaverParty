@@ -98,9 +98,24 @@ test("friends show online, unless they're invisible", async () => {
   assert.equal(list[0].online, false);
 });
 
+test("blocking ends a friendship and keeps you apart, without telling them", async () => {
+  await call("cat", "POST", "/api/friends", { username: "ann_b" });
+  await call("ann", "POST", "/api/friends/accept", { username: "catnip" });
+  assert.equal((await call("cat", "PUT", "/api/blocks/ann_b")).status, 200);
+  assert.deepEqual((await call("ann", "GET", "/api/friends")).body.friends.map((p) => p.username), ["bobcat"]);
+  // ann can't find cat, and her request looks normal but goes nowhere.
+  assert.deepEqual((await call("ann", "GET", "/api/friends/search?q=catn")).body.results, []);
+  assert.equal((await call("ann", "POST", "/api/friends", { username: "catnip" })).body.relation, "sent");
+  assert.deepEqual((await call("cat", "GET", "/api/friends")).body.incoming, []);
+  // cat has to unblock first.
+  assert.equal((await call("cat", "POST", "/api/friends", { username: "ann_b" })).status, 400);
+  await call("cat", "DELETE", "/api/blocks/ann_b");
+  assert.equal((await call("cat", "POST", "/api/friends", { username: "ann_b" })).body.relation, "sent");
+});
+
 test("deleting your account removes your friendships", async () => {
   await call("eve", "POST", "/api/friends", { username: "ann_b" });
   await call("eve", "POST", "/api/account/delete", { confirm: "bobXbob" });
-  assert.deepEqual((await call("ann", "GET", "/api/friends")).body.incoming, []);
+  assert.deepEqual(names((await call("ann", "GET", "/api/friends")).body.incoming), ["catnip"]);
   assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM friends WHERE from_anon_id = 'eve' OR to_anon_id = 'eve'").get().n, 0);
 });

@@ -1,6 +1,6 @@
 // Deleting your account. Removes your profile, games, avatar, chat messages,
-// lobby memberships, lobbies you hosted, endorsements you gave or got, and
-// friends and friend requests.
+// lobby memberships, lobbies you hosted, endorsements you gave or got,
+// blocks in either direction, warnings, and friends and friend requests.
 //
 // The account row itself (anonymous ID, join date, banned and moderator
 // flags; nothing else) is removed too, unless a report that names you is
@@ -27,6 +27,9 @@ function deleteAccount(anonId) {
       .run(anonId, anonId, anonId);
     conn.prepare("DELETE FROM messages WHERE anon_id = ?").run(anonId);
     conn.prepare("DELETE FROM friends WHERE from_anon_id = ? OR to_anon_id = ?").run(anonId, anonId);
+    conn.prepare("DELETE FROM blocks WHERE blocker_anon_id = ? OR blocked_anon_id = ?").run(anonId, anonId);
+    conn.prepare("DELETE FROM warnings WHERE anon_id = ?").run(anonId);
+    conn.prepare("UPDATE reports SET resolved_by = NULL WHERE resolved_by = ?").run(anonId);
     conn.prepare("DELETE FROM lobby_members WHERE anon_id = ?").run(anonId);
     conn.prepare("DELETE FROM reports WHERE status = 'resolved' AND (reported_anon_id = ? OR reporter_anon_id = ?)")
       .run(anonId, anonId);

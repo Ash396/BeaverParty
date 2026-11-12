@@ -62,10 +62,14 @@ function getOwn(anonId) {
 }
 
 // What other students see: no in-game names, no anon ID, and not whether
-// you're invisible (an invisible student just shows as offline).
+// you're invisible (an invisible student just shows as offline). Moderators
+// are labeled. Banned students' profiles are hidden.
 function getPublic(username) {
-  const row = db.get().prepare("SELECT anon_id FROM profiles WHERE username = ?").get(username);
-  if (!row) return null;
+  const row = db.get().prepare(`
+    SELECT p.anon_id, a.is_moderator, a.banned FROM profiles p JOIN accounts a ON a.anon_id = p.anon_id
+    WHERE p.username = ?
+  `).get(username);
+  if (!row || row.banned) return null;
   const own = getOwn(row.anon_id);
   return {
     username: own.username,
@@ -74,6 +78,7 @@ function getPublic(username) {
     dorm: own.dorm,
     avatar: own.avatar,
     games: own.games.map(({ game, rank }) => ({ game, rank })),
+    isModerator: Boolean(row.is_moderator),
   };
 }
 
@@ -104,4 +109,9 @@ function save(anonId, input) {
   return getOwn(anonId);
 }
 
-module.exports = { getOwn, getPublic, save, avatarOf, ValidationError };
+function anonIdOf(username) {
+  const row = db.get().prepare("SELECT anon_id FROM profiles WHERE username = ?").get(username);
+  return row ? row.anon_id : null;
+}
+
+module.exports = { anonIdOf, getOwn, getPublic, save, avatarOf, ValidationError };

@@ -5,6 +5,7 @@
 const db = require("./db");
 const { ValidationError } = require("./profiles");
 const { NotFoundError, ForbiddenError } = require("./lobbies");
+const blocks = require("./blocks");
 
 const BADGES = ["Good teammate", "Good comms", "Chill vibes"];
 const WINDOW_DAYS = 7;
@@ -31,12 +32,13 @@ function pending(anonId) {
   const given = conn.prepare(`
     SELECT badge FROM endorsements WHERE from_anon_id = ? AND to_anon_id = ? AND lobby_id = ?
   `);
+  const hidden = blocks.related(anonId);
   return lobbies
     .map((l) => ({
       id: l.id,
       game: l.game,
       closedAt: l.closedAt,
-      players: players.all(l.id, anonId).map((p) => ({
+      players: players.all(l.id, anonId).filter((p) => !hidden.has(p.anon_id)).map((p) => ({
         username: p.username,
         given: given.all(anonId, p.anon_id, l.id).map((g) => g.badge),
       })),
@@ -58,6 +60,7 @@ function set(anonId, lobbyId, username, badges) {
   if (!member.get(lobbyId, anonId)) throw new ForbiddenError("You weren't in this lobby.");
   if (!toId || !member.get(lobbyId, toId)) throw new ValidationError("That student wasn't in this lobby.");
   if (toId === anonId) throw new ValidationError("You can't endorse yourself.");
+  if (blocks.between(anonId, toId)) throw new ValidationError("You can't endorse this student.");
   if (lobby.state !== "closed") throw new ValidationError("You can endorse players once the lobby closes.");
   const open = conn.prepare("SELECT ? > datetime('now', ?) AS ok").get(lobby.closed_at, `-${WINDOW_DAYS} days`);
   if (!open.ok) throw new ValidationError(`Endorsements close ${WINDOW_DAYS} days after the lobby.`);

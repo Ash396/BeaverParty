@@ -9,6 +9,7 @@ const oidc = require("./oidc");
 const accounts = require("./accounts");
 const profiles = require("./profiles");
 const friends = require("./friends");
+const moderation = require("./moderation");
 const { sign, unsign, parseCookies, cookie } = require("./session");
 const { computeAnonId } = require("./keyservice");
 
@@ -116,6 +117,7 @@ async function handle(config, req, res, url) {
       signedIn: Boolean(anonId),
       isModerator: Boolean(account && account.isModerator),
       username: profile ? profile.username : null,
+      warning: anonId ? moderation.pendingWarning(anonId) : null,
       invisible: Boolean(profile && profile.invisible),
       avatar: profile ? profile.avatar : null,
       friendRequests: profile ? friends.incomingCount(anonId) : 0,

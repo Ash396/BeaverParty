@@ -4,11 +4,16 @@
 // Declining, cancelling, and unfriending all just delete the row, and the
 // other person is never told which one happened.
 //
+// Blocking (either way) ends a friendship and any request, and blocks.js
+// keeps you apart after that: you can't send each other requests, and
+// someone who blocked you doesn't show up in your searches.
+//
 // Finding people is by username only: a search needs at least 3 characters
 // and returns a handful of usernames that start with it, so there is no
 // browsable list of everyone who uses BeaverParty.
 const db = require("./db");
 const presence = require("./presence");
+const blocks = require("./blocks");
 const { ValidationError, avatarOf } = require("./profiles");
 
 const MAX_PENDING = 20; // outgoing requests waiting at once
@@ -62,6 +67,10 @@ function request(anonId, username) {
   const now = relation(anonId, otherId);
   if (now === "received") return accept(anonId, username);
   if (now !== "none") return { otherId, relation: now };
+  if (blocks.blockedBy(anonId).has(otherId)) throw new ValidationError("You blocked this student. Unblock them first.");
+  // If they blocked you, look the same as a request that's waiting, so the
+  // block isn't revealed, but store nothing.
+  if (blocks.between(anonId, otherId)) return { otherId: null, relation: "sent" };
   const pending = db.get().prepare("SELECT COUNT(*) AS n FROM friends WHERE from_anon_id = ? AND accepted = 0").get(anonId).n;
   if (pending >= MAX_PENDING) throw new ValidationError("You have too many requests waiting. Cancel some first.");
   db.get().prepare("INSERT INTO friends (from_anon_id, to_anon_id) VALUES (?, ?)").run(anonId, otherId);
@@ -87,6 +96,13 @@ function remove(anonId, username) {
   return { otherId, relation: "none" };
 }
 
+// Called when either of two students blocks the other.
+function endBetween(a, b) {
+  db.get().prepare(`
+    DELETE FROM friends WHERE (from_anon_id = ? AND to_anon_id = ?) OR (from_anon_id = ? AND to_anon_id = ?)
+  `).run(a, b, b, a);
+}
+
 function card(otherId, extra = {}) {
   return { username: usernameOf(otherId), avatar: avatarOf(otherId), ...extra };
 }
@@ -100,7 +116,7 @@ function list(anonId) {
   const friends = [], incoming = [], outgoing = [];
   for (const r of rows) {
     const otherId = r.from_anon_id === anonId ? r.to_anon_id : r.from_anon_id;
-    if (!usernameOf(otherId)) continue;
+    if (!usernameOf(otherId) || blocks.between(anonId, otherId)) continue;
     if (r.accepted) friends.push(card(otherId, { online: presence.isOnline(otherId) }));
     else if (r.from_anon_id === anonId) outgoing.push(card(otherId));
     else incoming.push(card(otherId));
@@ -123,10 +139,11 @@ function search(anonId, query) {
     SELECT anon_id FROM profiles WHERE username LIKE ? ESCAPE '\\' AND anon_id <> ?
     ORDER BY (username = ? COLLATE NOCASE) DESC, length(username), username LIMIT ?
   `).all(`${q.replace(/_/g, "\\_")}%`, anonId, q, SEARCH_LIMIT); // "_" is a LIKE wildcard
-  return rows.map((r) => {
+  const hidden = blocks.blockers(anonId);
+  return rows.filter((r) => !hidden.has(r.anon_id)).map((r) => {
     const rel = relation(anonId, r.anon_id);
     return card(r.anon_id, rel === "friend" ? { relation: rel, online: presence.isOnline(r.anon_id) } : { relation: rel });
   });
 }
 
-module.exports = { request, accept, remove, list, search, relation, incomingCount, anonIdOf, SEARCH_MIN };
+module.exports = { request, accept, remove, list, search, relation, incomingCount, anonIdOf, endBetween, SEARCH_MIN };

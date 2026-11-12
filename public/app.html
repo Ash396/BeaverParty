@@ -3,20 +3,25 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1C181C">
   <title>BeaverParty</title>
   <link rel="stylesheet" href="style.css">
+  <script src="theme.js"></script>
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
-      <div class="brand">BeaverParty</div>
+      <div class="brand">BeaverParty <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
       <nav>
         <a href="#lobbies">Lobbies</a>
         <a href="#profile">My profile</a>
         <a href="#heatmap">Heat map</a>
         <a href="#moderation" id="nav-moderation" hidden>Moderation</a>
       </nav>
-      <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+      <div class="bottom">
+        <button type="button" class="theme-toggle" data-theme-toggle>Light mode</button>
+        <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+      </div>
     </aside>
 
     <section class="content">
@@ -90,6 +95,7 @@
           </fieldset>
           <fieldset>
             <legend>Optional <span class="muted">(leave blank to hide)</span></legend>
+            <p class="notice small">Any signed-in student can see these on your profile. Your real name, or even your dorm combined with your games, can be enough for someone to work out who you are. Leave them blank to stay anonymous.</p>
             <label>Real name <input name="realName" maxlength="60" autocomplete="off"></label>
             <label>Dorm <select name="dorm"><option value="">Don't show</option></select></label>
           </fieldset>

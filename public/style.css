@@ -1,79 +1,136 @@
-/* Shared styles. Change the look here: colors and font are variables. */
-:root {
-  --accent: #a31f34;      /* MIT red */
-  --text: #000;
-  --muted: #555;
-  --border: #ddd;
-  --bg: #fff;
-  --sidebar-bg: #f5f5f5;
+/* Shared styles. The look is set by the color variables below: dark is the
+   default, and [data-theme="light"] (toggled by theme.js) swaps them. */
+:root, :root[data-theme="dark"] {
+  /* Team palette */
+  --shadow: #1C181C;
+  --tomato: #FF6A4D;
+  --gold: #FFC14D;
+  --mint: #4CFCA7;
+  --sapphire: #4D6AFF;
+  --alabaster: #E6E8E6;
+
+  /* What each color is for */
+  --bg: var(--shadow);
+  --surface: #241F24;     /* cards, sidebar */
+  --surface-2: #2E282E;   /* inputs, hover */
+  --border: #3E373E;
+  --text: var(--alabaster);
+  --muted: #A39CA3;
+  --primary: var(--mint); /* main buttons, current page */
+  --on-primary: var(--shadow);
+  --link: #8A9BFF;        /* Sapphire, lightened to read on dark */
+  --danger: var(--tomato);
+  --highlight: var(--gold);
+  /* Player colors in chat, from the palette */
+  --p0: var(--mint); --p1: var(--gold); --p2: var(--tomato); --p3: #8A9BFF;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #F4F5F4;
+  --surface: #FFFFFF;
+  --surface-2: var(--alabaster);
+  --border: #D2D5D2;
+  --text: var(--shadow);
+  --muted: #5F595F;
+  --link: #3049D9;
+  --danger: #C23D22;      /* Tomato, darkened to read on light */
+  --highlight: #8A5E00;
+  --p0: #007A45; --p1: #8A5E00; --p2: #C23D22; --p3: #3049D9;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 body { font-family: var(--font); margin: 0; background: var(--bg); color: var(--text); }
+a { color: var(--link); }
 main { max-width: 640px; margin: 4rem auto; padding: 0 16px; }
-.button, button { display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--accent); background: var(--accent); color: #fff; text-decoration: none; font: inherit; cursor: pointer; border-radius: 4px; }
+.button, button { display: inline-block; padding: 0.5rem 1rem; border: 1px solid var(--primary); background: var(--primary); color: var(--on-primary); text-decoration: none; font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; }
+.button:hover, button:hover { filter: brightness(1.08); }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .muted { color: var(--muted); }
 table { border-collapse: collapse; margin: 1rem 0; }
 th, td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; border-bottom: 1px solid var(--border); }
 
+/* Logo: the name plus four palette dots. */
+.brand { font-weight: 800; font-size: 1.25rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.5rem; }
+.dots { display: inline-flex; gap: 3px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.dots i:nth-child(1) { background: var(--tomato); }
+.dots i:nth-child(2) { background: var(--gold); }
+.dots i:nth-child(3) { background: var(--mint); }
+.dots i:nth-child(4) { background: var(--sapphire); }
+button.theme-toggle { background: none; border: none; color: var(--muted); padding: 0.5rem 0.75rem; font-weight: normal; text-align: left; }
+
 /* App shell: sidebar on the left on laptops, tab bar at the bottom on phones. */
 .app { display: flex; min-height: 100vh; }
-.sidebar { width: 220px; flex-shrink: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
-.sidebar .brand { font-weight: bold; font-size: 1.25rem; margin-bottom: 1rem; }
+.sidebar { position: sticky; top: 0; height: 100vh; width: 220px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border); padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.sidebar .brand { margin-bottom: 1rem; }
 .sidebar nav { display: flex; flex-direction: column; gap: 0.25rem; }
-.sidebar nav a { color: var(--text); text-decoration: none; padding: 0.5rem 0.75rem; border-radius: 4px; }
-.sidebar nav a[aria-current="page"] { background: var(--accent); color: #fff; }
-.sidebar form { margin-top: auto; }
-.sidebar form button { background: none; color: var(--muted); border: none; padding: 0.5rem 0.75rem; }
+.sidebar nav a { color: var(--text); text-decoration: none; padding: 0.5rem 0.75rem; border-radius: 6px; }
+.sidebar nav a:hover { background: var(--surface-2); }
+.sidebar nav a[aria-current="page"] { background: var(--primary); color: var(--on-primary); font-weight: 600; }
+.sidebar .bottom { margin-top: auto; display: flex; flex-direction: column; }
+.sidebar form button { background: none; color: var(--muted); border: none; padding: 0.5rem 0.75rem; font-weight: normal; text-align: left; }
 .content { flex: 1; padding: 2rem; max-width: 900px; }
 .content h1 { margin-top: 0; }
 
 @media (max-width: 720px) {
   .app { flex-direction: column; }
   .content { padding: 1rem 16px 5rem; }
-  .sidebar { position: fixed; bottom: 0; left: 0; right: 0; width: auto; flex-direction: row; align-items: center; padding: 0.25rem; border-right: none; border-top: 1px solid var(--border); z-index: 10; }
+  .sidebar { height: auto; top: auto; position: fixed; bottom: 0; left: 0; right: 0; width: auto; flex-direction: row; align-items: center; padding: 0.25rem; border-right: none; border-top: 1px solid var(--border); z-index: 10; }
   .sidebar .brand { display: none; }
   .sidebar nav { flex-direction: row; flex: 1; justify-content: space-around; }
   .sidebar nav a { padding: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
-  .sidebar form { margin-top: 0; }
+  .sidebar .bottom { margin-top: 0; flex-direction: row; }
+  .sidebar .bottom button { font-size: 0.85rem; padding: 0.5rem; }
 }
 
 /* Forms */
 .form label { display: block; margin: 0.75rem 0; }
-.form input:not([type="checkbox"]), .form select { display: block; width: 100%; max-width: 360px; padding: 0.4rem; font: inherit; border: 1px solid var(--border); border-radius: 4px; margin-top: 0.25rem; }
-.form fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 1rem 0; padding: 0.5rem 1rem; }
+input, select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+input[type="checkbox"] { accent-color: var(--mint); }
+.form input:not([type="checkbox"]), .form select { display: block; width: 100%; max-width: 360px; padding: 0.4rem; margin-top: 0.25rem; }
+.form fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 1rem 0; padding: 0.5rem 1rem; }
 .game-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
 .game-row:last-child { border-bottom: none; }
 .game-row label { margin: 0; flex: 1 1 200px; display: flex; gap: 0.5rem; align-items: center; }
 .game-row input[type="text"] { flex: 1 1 120px; max-width: 160px; margin: 0; }
 .small { font-size: 0.9rem; }
-.error { color: var(--accent); }
-.notice { background: var(--sidebar-bg); border-left: 4px solid var(--accent); padding: 0.5rem 0.75rem; }
+.error { color: var(--danger); }
+.notice { background: var(--surface); border-left: 4px solid var(--gold); padding: 0.5rem 0.75rem; border-radius: 0 6px 6px 0; }
 .details dt { font-weight: bold; margin-top: 0.75rem; }
 .details dd { margin: 0.25rem 0 0; }
 
 /* Lobbies */
-button.secondary { background: var(--bg); color: var(--text); border-color: var(--border); }
-.badge { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--sidebar-bg); border: 1px solid var(--border); text-transform: uppercase; }
-.create-box { margin: 1rem 0; border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 1rem; }
+button.secondary { background: var(--surface-2); color: var(--text); border-color: var(--border); font-weight: normal; }
+.badge { display: inline-block; font-size: 0.8rem; padding: 0.1rem 0.5rem; border-radius: 999px; background: var(--surface-2); color: var(--highlight); border: 1px solid var(--border); text-transform: uppercase; font-weight: 600; }
+.create-box { margin: 1rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 1rem; }
 .create-box summary { cursor: pointer; font-weight: bold; }
 .form label.inline { display: flex; gap: 0.5rem; align-items: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
-.filters select { padding: 0.35rem; font: inherit; }
+.filters select { padding: 0.35rem; }
 .lobby-list { display: grid; gap: 0.75rem; }
-.lobby-card { border: 1px solid var(--border); border-radius: 4px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.lobby-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .lobby-card h3 { margin: 0 0 0.25rem; }
 .lobby-card p { margin: 0.15rem 0; }
 .roster { padding-left: 1.25rem; }
-.chat-log { border: 1px solid var(--border); border-radius: 4px; height: 280px; overflow-y: auto; padding: 0.5rem 0.75rem; background: var(--bg); }
+.chat-log { border: 1px solid var(--border); border-radius: 8px; height: 280px; overflow-y: auto; padding: 0.5rem 0.75rem; background: var(--surface); }
 .chat-log p { margin: 0.3rem 0; overflow-wrap: anywhere; }
-.chat-log .who { font-weight: bold; margin-right: 0.4rem; }
+.chat-log .who { font-weight: bold; margin-right: 0.4rem; color: var(--p0); }
+.chat-log .who.p1 { color: var(--p1); } .chat-log .who.p2 { color: var(--p2); } .chat-log .who.p3 { color: var(--p3); }
 .chat-log .when { color: var(--muted); font-size: 0.8rem; margin-left: 0.4rem; }
 .chat-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
-.chat-form input { flex: 1; padding: 0.45rem; font: inherit; border: 1px solid var(--border); border-radius: 4px; }
+.chat-form input { flex: 1; padding: 0.45rem; }
 .endorse-card { display: block; margin-top: 0.75rem; }
 .endorse-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; padding: 0.35rem 0; }
 .endorse-row > a { min-width: 8rem; font-weight: bold; }
 .endorse-row label { display: inline-flex; gap: 0.3rem; align-items: center; }
+
+/* Landing page: drifting dots and hexagons behind a centered card. */
+body.landing { min-height: 100vh; display: flex; align-items: center; justify-content: center; overflow-x: hidden; }
+#sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.landing main { position: relative; z-index: 1; margin: 2rem 16px; padding: 2rem; max-width: 560px; background: color-mix(in srgb, var(--bg) 82%, transparent); border: 1px solid var(--border); border-radius: 16px; backdrop-filter: blur(6px); }
+.landing h1 { font-size: 2.5rem; margin: 0 0 0.5rem; }
+.landing h1 .dots i { width: 12px; height: 12px; }
+.landing .corner { position: fixed; top: 0.5rem; right: 0.5rem; z-index: 2; }

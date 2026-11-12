@@ -9,13 +9,28 @@ const oidc = require("./oidc");
 const accounts = require("./accounts");
 const profiles = require("./profiles");
 const { sign, unsign, parseCookies, cookie } = require("./session");
+const { computeAnonId } = require("./keyservice");
 
 const LOGIN_COOKIE = "bp_login";
 const SESSION_COOKIE = "bp_session";
 const LOGIN_TTL_SECONDS = 10 * 60;
 
-function anonIdFor(config, email) {
-  return crypto.createHmac("sha256", config.anonIdKey).update(email).digest("hex");
+// Anon ID = HMAC(ANON_ID_KEY, email). In production the key lives only in
+// the Key Service (server/keyservice.js), so we ask it. For local
+// development without one, we compute it here with ANON_ID_KEY. Both give
+// the same ID for the same key, so switching doesn't change any account.
+async function anonIdFor(config, email) {
+  if (!config.keyServiceUrl) return computeAnonId(config.anonIdKey, email);
+  const res = await fetch(`${config.keyServiceUrl.replace(/\/$/, "")}/anon-id`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.keyServiceToken}` },
+    body: JSON.stringify({ email }),
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error(`Key Service answered ${res.status}`);
+  const { anonId } = await res.json();
+  if (!/^[0-9a-f]{64}$/.test(anonId || "")) throw new Error("Key Service sent a bad ID");
+  return anonId;
 }
 
 // Returns the signed-in account's anon ID, or null.
@@ -40,11 +55,11 @@ function json(res, status, body, extraHeaders = {}) {
 
 // Picks where a just-verified person goes, and creates the account and
 // session cookie if they're allowed in.
-function decide(config, person) {
+async function decide(config, person) {
   if (!config.allowedAffiliations.includes(person.affiliation)) {
     return { location: "/students-only.html", cookies: [], result: "refused: not a student" };
   }
-  const anonId = anonIdFor(config, person.email);
+  const anonId = await anonIdFor(config, person.email);
   const existing = accounts.find(anonId);
   if (existing && existing.banned) {
     return { location: "/banned.html", cookies: [], result: "refused: banned", anonId };
@@ -141,7 +156,14 @@ async function handle(config, req, res, url) {
 
     // Steps 9-16 of figure 2: non-students are turned away with nothing
     // stored; for students we keep only the anon ID and drop email and name.
-    const outcome = decide(config, person);
+    let outcome;
+    try {
+      outcome = await decide(config, person);
+    } catch (err) {
+      console.error("sign-in failed:", err.message);
+      redirect(res, "/signin-failed.html", [clearLogin]);
+      return true;
+    }
     outcome.cookies.unshift(clearLogin);
     if (config.debugShowIdentity) {
       // Test-only: show what Petrock sent. Shown once, never stored.

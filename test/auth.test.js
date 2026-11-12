@@ -112,18 +112,18 @@ test("a student signs in and gets a 7-day session", async () => {
   const me = await (await fetch(`${base}/api/me`, { headers: { Cookie: session } })).json();
   assert.deepEqual(me, { authEnabled: true, signedIn: true, isModerator: false, username: null });
   // The account is stored under the HMAC of the lowercased email only.
-  assert.ok(accounts.find(anonIdFor(config, "tim@mit.edu")));
+  assert.ok(accounts.find(await anonIdFor(config, "tim@mit.edu")));
 });
 
 test("a non-student is turned away and nothing is stored", async () => {
   const { location, session } = await signIn({ email: "prof@mit.edu", affiliation: "faculty" });
   assert.equal(location, "/students-only.html");
   assert.equal(session, undefined);
-  assert.equal(accounts.find(anonIdFor(config, "prof@mit.edu")), undefined);
+  assert.equal(accounts.find(await anonIdFor(config, "prof@mit.edu")), undefined);
 });
 
 test("a banned student is refused", async () => {
-  accounts.setBanned(anonIdFor(config, "bad@mit.edu"), true);
+  accounts.setBanned(await anonIdFor(config, "bad@mit.edu"), true);
   const { location, session } = await signIn({ email: "bad@mit.edu", affiliation: "student" });
   assert.equal(location, "/banned.html");
   assert.equal(session, undefined);
@@ -169,4 +169,32 @@ test("with DEBUG_SHOW_IDENTITY on, the test page shows what Petrock sent", async
   } finally {
     config.debugShowIdentity = false;
   }
+});
+
+test("with a Key Service, the web server needs no ANON_ID_KEY and accounts keep the same ID", async () => {
+  const { createKeyServer } = require("../server/keyservice");
+  const keys = createKeyServer({ key: "anon-key", token: "tok" });
+  const keysUrl = `http://127.0.0.1:${await listen(keys)}`;
+  const before = { anonIdKey: config.anonIdKey };
+  Object.assign(config, { anonIdKey: undefined, keyServiceUrl: keysUrl, keyServiceToken: "tok" });
+  try {
+    const { location } = await signIn({ email: "tim@mit.edu", affiliation: "student" });
+    assert.equal(location, "/app.html");
+    // Same key, same ID as when the web server computed it itself.
+    assert.equal(await anonIdFor(config, "tim@mit.edu"), await anonIdFor({ anonIdKey: "anon-key" }, "tim@mit.edu"));
+
+    // If the Key Service refuses, sign-in fails safely.
+    config.keyServiceToken = "wrong";
+    assert.equal((await signIn({ email: "tim@mit.edu", affiliation: "student" })).location, "/signin-failed.html");
+  } finally {
+    Object.assign(config, before, { keyServiceUrl: undefined, keyServiceToken: undefined });
+    keys.close();
+  }
+});
+
+test("config wants the Key Service token instead of ANON_ID_KEY when a Key Service is set", () => {
+  const base = { PETROCK_CLIENT_ID: "c", PETROCK_CLIENT_SECRET: "s", SESSION_SECRET: "x" };
+  assert.deepEqual(loadConfig({ ...base, KEY_SERVICE_URL: "https://k" }).missing, ["KEY_SERVICE_TOKEN"]);
+  assert.equal(loadConfig({ ...base, KEY_SERVICE_URL: "https://k", KEY_SERVICE_TOKEN: "t" }).authEnabled, true);
+  assert.deepEqual(loadConfig(base).missing, ["ANON_ID_KEY"]);
 });

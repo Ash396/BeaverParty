@@ -205,12 +205,20 @@ async function renderMyLobby() {
   lobby.messages.forEach(addMessage);
 }
 
+// Each username always gets the same palette color in chat.
+function playerColor(username) {
+  let h = 2166136261; // FNV-1a, then mixed so similar names spread out
+  for (const c of username || "") { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); }
+  h ^= h >>> 16; h = Math.imul(h, 0x45d9f3b); h ^= h >>> 16;
+  return `p${(h >>> 0) % 4}`;
+}
+
 function addMessage(m) {
   const log = document.getElementById("chat-log");
   if (log.querySelector(`[data-id="${m.id}"]`)) return;
   const time = new Date(m.createdAt.replace(" ", "T") + "Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   log.append(el("p", { dataset: { id: m.id } },
-    el("span", { className: "who", textContent: m.username || "(deleted)" }), m.body, el("span", { className: "when", textContent: time })));
+    el("span", { className: `who ${playerColor(m.username)}`, textContent: m.username || "(deleted)" }), m.body, el("span", { className: "when", textContent: time })));
   log.scrollTop = log.scrollHeight;
 }
 document.getElementById("chat-form").addEventListener("submit", async (event) => {

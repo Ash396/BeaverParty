@@ -45,7 +45,10 @@ function createServer(config) {
   });
 }
 
-if (require.main === module) {
+if (require.main === module && process.env.ROLE === "keys") {
+  // Same image, different job: run the Key Service instead (see keyservice.js).
+  require("./keyservice").start();
+} else if (require.main === module) {
   const config = loadConfig();
   db.open(config.dbPath);
   // Delete old lobby chat now and every hour.

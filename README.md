@@ -108,6 +108,7 @@ server/     The Node.js server
   events.js   live updates to browsers over Server-Sent Events
   friends.js  mutual friend requests, friends list, username search (3+ letters, prefix only)
   presence.js online/invisible status: online while the app is open, kept in memory only
+  heatmap.js  opt-in heat map: hourly player counts per game, saved only when at least k (HEATMAP_K)
   endorsements.js badges players give each other after a lobby closes
   keyservice.js the Key Service: holds ANON_ID_KEY, turns emails into anonymous IDs
   deletion.js deleting your account (keeps only the bare ID row while a report naming you is open)
@@ -117,4 +118,4 @@ test/       Tests (npm test)
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All but the heat map's data are built: Auth, Profile, Lobby, Presence, Endorsement, and Moderation, plus blocking. The Key Service is built too. Still to come: the heat map, and maybe friends.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All six are built, plus blocking, friends, the Key Service, and the opt-in heat map. Still to come: rank and open-slot lobby filters, a chat text filter, scheduled lobbies, and the re-identification warning on profiles.

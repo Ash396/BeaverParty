@@ -58,6 +58,11 @@ if (require.main === module && process.env.ROLE === "keys") {
   };
   cleanup();
   setInterval(cleanup, 3600_000).unref();
+  // Heat map: count opted-in players in lobbies once a minute.
+  const heatmap = require("./heatmap");
+  heatmap.options.k = config.heatmapK;
+  heatmap.sample();
+  setInterval(() => heatmap.sample(), 60_000).unref();
   if (!config.authEnabled) {
     console.warn(`Sign-in is off. Missing: ${config.missing.join(", ")}. See .env.example.`);
   }

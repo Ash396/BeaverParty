@@ -152,6 +152,21 @@ const MIGRATIONS = [
   );
   CREATE INDEX friends_to ON friends(to_anon_id);
   `,
+  // 7: heat map (see heatmap.js). Opt-in per student. heatmap_hours holds
+  // only totals per game and hour (hours since 1970, UTC), never who.
+  `
+  ALTER TABLE profiles ADD COLUMN heatmap_opt_in INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE heatmap_hours (
+    game    TEXT NOT NULL,
+    hour    INTEGER NOT NULL,
+    players INTEGER NOT NULL,
+    PRIMARY KEY (game, hour)
+  );
+  CREATE TABLE heatmap_meta (
+    key   TEXT PRIMARY KEY,
+    value INTEGER NOT NULL
+  );
+  `,
 ];
 
 let db = null;

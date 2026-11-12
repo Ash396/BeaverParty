@@ -183,7 +183,24 @@
       </div>
       <div data-page="heatmap" hidden>
         <h1>Heat map</h1>
-        <p class="muted">Coming soon: when students are playing, by game and time.</p>
+        <p class="muted">When students are in lobbies, by day and hour (Boston time). Use it to pick a time when people are around.</p>
+        <form id="heatmap-form" class="filters">
+          <label>Game <select name="game"></select></label>
+        </form>
+        <div id="heatmap-grid" class="heatmap" role="img"></div>
+        <div class="heatmap-legend small muted" aria-hidden="true">
+          <span>Fewer</span><i class="hm-1"></i><i class="hm-2"></i><i class="hm-3"></i><i class="hm-4"></i><span>More</span>
+          <span class="hm-gap"></span><span class="hm-none"><i class="hm-0"></i> Not enough players to show</span>
+        </div>
+        <p id="heatmap-summary" class="small"></p>
+        <p id="heatmap-empty" class="muted" hidden>Nothing to show yet. Hours appear here once enough students who opted in have played at that time.</p>
+        <p id="heatmap-note" class="small muted"></p>
+        <section class="heatmap-optin">
+          <h2>Count me in</h2>
+          <label class="check"><input type="checkbox" id="heatmap-optin"> Add me to the heat map counts</label>
+          <p class="small muted">Off unless you turn it on. While you're in a lobby, you're counted toward that game's hour. We save only the number of players, never who, and only when at least <span class="hm-k">5</span> students were counted that hour. You aren't counted while you're invisible.</p>
+          <p id="heatmap-error" class="error" hidden></p>
+        </section>
       </div>
       <div data-page="moderation" hidden>
         <h1>Moderation</h1>

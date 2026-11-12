@@ -82,10 +82,11 @@ server/     The Node.js server
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
   lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
   events.js   live updates to browsers over Server-Sent Events
+  endorsements.js badges players give each other after a lobby closes
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). Auth is started here. We'll pick a framework and database before building the rest.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). Auth, Profile, Lobby, and Endorsement are built. Still to come: moving the anonymous-ID key into its own Key Service, reports and moderation, and the heat map.

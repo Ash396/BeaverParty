@@ -6,6 +6,7 @@
 const db = require("./db");
 const { GAMES } = require("./catalog");
 const { ValidationError, avatarOf } = require("./profiles");
+const presence = require("./presence");
 
 const VIBES = ["casual", "competitive"];
 const MAX_SLOTS = 10;
@@ -107,6 +108,7 @@ function summary(lobby) {
     host: usernameOf(lobby.host_anon_id),
     members: members.map(usernameOf),
     avatars: members.map(avatarOf),
+    online: members.map(presence.isOnline),
     createdAt: lobby.created_at,
   };
 }
@@ -136,6 +138,7 @@ function detail(anonId, id) {
     out.roster = memberIds(id).map((m) => ({
       username: usernameOf(m),
       avatar: avatarOf(m),
+      online: presence.isOnline(m),
       inGameName: (ign.get(m, lobby.game) || {}).in_game_name || null,
     }));
     out.discordInvite = lobby.state !== "open" ? lobby.discord_invite : null;

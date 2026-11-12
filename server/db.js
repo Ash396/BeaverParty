@@ -102,6 +102,11 @@ const MIGRATIONS = [
   ALTER TABLE profiles ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'brown';
   ALTER TABLE profiles ADD COLUMN avatar_item TEXT NOT NULL DEFAULT 'none';
   `,
+  // 4: "appear offline" setting (see presence.js). Online status itself is
+  // kept in memory only, so there is no last-seen history.
+  `
+  ALTER TABLE profiles ADD COLUMN invisible INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 let db = null;

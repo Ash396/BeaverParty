@@ -3,6 +3,7 @@
 // to members of a lobby for that game. Saving overwrites, so no history.
 const db = require("./db");
 const { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
+const presence = require("./presence");
 
 const USERNAME_RE = /^[A-Za-z0-9_-]{3,20}$/;
 
@@ -56,16 +57,19 @@ function getOwn(anonId) {
   return {
     username: row.username, realName: row.real_name, dorm: row.dorm, games,
     avatar: { color: row.avatar_color, item: row.avatar_item },
+    invisible: Boolean(row.invisible),
   };
 }
 
-// What other students see: no in-game names, and no anon ID.
+// What other students see: no in-game names, no anon ID, and not whether
+// you're invisible (an invisible student just shows as offline).
 function getPublic(username) {
   const row = db.get().prepare("SELECT anon_id FROM profiles WHERE username = ?").get(username);
   if (!row) return null;
   const own = getOwn(row.anon_id);
   return {
     username: own.username,
+    online: presence.isOnline(row.anon_id),
     realName: own.realName,
     dorm: own.dorm,
     avatar: own.avatar,

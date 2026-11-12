@@ -60,6 +60,11 @@ th, td { text-align: left; padding: 0.25rem 1rem 0.25rem 0; border-bottom: 1px s
 .dots i:nth-child(2) { background: var(--gold); }
 .dots i:nth-child(3) { background: var(--mint); }
 .dots i:nth-child(4) { background: var(--sapphire); }
+/* Online status: a filled mint dot when online, a hollow ring when offline or invisible. */
+.presence { display: inline-block; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--muted); box-sizing: border-box; flex-shrink: 0; margin-right: 0.3rem; vertical-align: middle; }
+.presence.on { background: var(--mint); border-color: var(--mint); }
+:root[data-theme="light"] .presence.on { border-color: #1E9E60; }
+button.status-toggle { background: none; border: none; color: var(--text); padding: 0.5rem 0.75rem; font-weight: normal; text-align: left; display: flex; align-items: center; }
 button.theme-toggle { background: none; border: none; color: var(--muted); padding: 0.5rem 0.75rem; font-weight: normal; text-align: left; }
 
 /* App shell: sidebar on the left on laptops, tab bar at the bottom on phones. */
@@ -84,6 +89,8 @@ button.theme-toggle { background: none; border: none; color: var(--muted); paddi
   .sidebar nav a { padding: 0.5rem; font-size: 0.85rem; white-space: nowrap; }
   .sidebar .bottom { margin-top: 0; flex-direction: row; }
   .sidebar .bottom button { font-size: 0.85rem; padding: 0.5rem; }
+  .status-toggle .status-label { display: none; } /* just the dot on phones */
+  .status-toggle .presence { width: 12px; height: 12px; margin: 0; }
 }
 
 /* Forms */
@@ -146,6 +153,7 @@ button.choice { background: var(--surface-2); border: 2px solid var(--border); p
 button.choice[aria-pressed="true"] { border-color: var(--primary); }
 .user-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
 .user-head h1 { margin: 0; }
+.user-head p { margin: 0.2rem 0 0; }
 .seats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
 .seat { width: 46px; height: 46px; border-radius: 50%; border: 2px dashed var(--border); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
 .seat.filled { border: 2px solid var(--primary); background: var(--surface-2); }

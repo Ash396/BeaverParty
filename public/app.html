@@ -25,6 +25,11 @@
     </aside>
 
     <section class="content">
+      <div id="warning" class="notice warning" role="alert" hidden>
+        <p><strong>A moderator warned your account.</strong> <span id="warning-text"></span></p>
+        <p class="small">Please follow the community rules. Another problem can lead to a ban.</p>
+        <p><button type="button" id="warning-ok">OK</button></p>
+      </div>
       <!-- One section per page; app.js shows the one named in the URL after #. -->
       <div data-page="lobbies">
         <!-- Shown while you're in a lobby -->
@@ -116,6 +121,12 @@
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
           <p id="preview-link" hidden><a href="#">See what other students see</a></p>
         </form>
+        <section id="blocked-section" hidden>
+          <h2>Blocked players</h2>
+          <p class="small muted">They aren't told. You won't see each other's lobbies, you can't endorse each other, and you won't see their chat messages.</p>
+          <ul id="blocked-list" class="plain-list"></ul>
+          <p id="blocked-empty" class="small muted">You haven't blocked anyone. You can block someone from their profile or a lobby.</p>
+        </section>
         <section id="delete-section" class="danger-zone" hidden>
           <h2>Delete account</h2>
           <p class="small">This removes your profile, games, avatar, chat messages, endorsements, and any lobbies you hosted. It can't be undone. You can sign in again later and start fresh.</p>
@@ -129,8 +140,13 @@
       </div>
       <div data-page="user" hidden>
         <p><a href="#profile" id="back-link">&larr; Back</a></p>
-        <div class="user-head"><span id="user-avatar"></span><h1 id="user-name"></h1></div>
+        <div class="user-head"><span id="user-avatar"></span><h1 id="user-name"></h1><span id="user-mod" class="badge mod" hidden>Moderator</span></div>
         <dl id="user-details" class="details"></dl>
+        <p id="user-actions" class="actions" hidden>
+          <button type="button" id="user-block" class="secondary"></button>
+          <button type="button" id="user-report" class="secondary">Report</button>
+        </p>
+        <p id="user-action-note" class="small muted" hidden></p>
         <p id="user-missing" hidden>No student with that username.</p>
       </div>
       <div data-page="heatmap" hidden>
@@ -139,10 +155,35 @@
       </div>
       <div data-page="moderation" hidden>
         <h1>Moderation</h1>
-        <p class="muted">Coming soon: the queue of reports with their saved chat.</p>
+        <p class="small muted">You see the reported username and a saved copy of the chat. You never see who reported, real names, or dorms. In the chat copy, the reported player is shown by username and everyone else as Player 1, 2, and so on. Resolving a report deletes its copy. Reports about you, or that you filed, go to the other moderators.</p>
+        <h2>Open reports <span id="mod-count" class="badge"></span></h2>
+        <div id="mod-reports"></div>
+        <p id="mod-empty" class="muted" hidden>No open reports.</p>
+        <p id="mod-error" class="error" hidden></p>
+        <h2>Banned players</h2>
+        <ul id="mod-banned" class="plain-list"></ul>
+        <p id="mod-banned-empty" class="small muted" hidden>Nobody is banned.</p>
+        <h2>Recent decisions</h2>
+        <table id="mod-history" class="small"></table>
       </div>
     </section>
   </div>
+  <dialog id="report-dialog" class="dialog">
+    <form id="report-form" class="form" method="dialog">
+      <h2>Report <span id="report-name"></span></h2>
+      <p id="report-context" class="small muted"></p>
+      <label>What happened?
+        <select name="reason" required><option value="">Pick a reason</option></select>
+      </label>
+      <label>Details <span class="muted">(optional)</span>
+        <textarea name="details" maxlength="500" rows="3"></textarea>
+      </label>
+      <label class="inline"><input type="checkbox" name="alsoBlock"> Also block them</label>
+      <p class="small muted">They won't know who reported them, and neither will moderators. Moderators see their username and a copy of the lobby chat, which is deleted once the report is resolved.</p>
+      <p id="report-error" class="error" hidden></p>
+      <p><button type="submit" value="send">Send report</button> <button type="button" id="report-cancel" class="secondary">Cancel</button></p>
+    </form>
+  </dialog>
   <script src="avatar.js"></script>
   <script src="app.js"></script>
 </body>

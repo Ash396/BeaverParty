@@ -6,6 +6,7 @@
 const db = require("./db");
 const { GAMES } = require("./catalog");
 const { ValidationError, avatarOf } = require("./profiles");
+const blocks = require("./blocks");
 
 const VIBES = ["casual", "competitive"];
 const MAX_SLOTS = 10;
@@ -111,8 +112,9 @@ function summary(lobby) {
   };
 }
 
-// Open lobbies, newest first, with optional filters.
-function list({ game, vibe, voice } = {}) {
+// Open lobbies, newest first, with optional filters. Lobbies with someone
+// the viewer has a block with (either way) are left out.
+function list({ game, vibe, voice } = {}, viewer = null) {
   const where = ["state = 'open'"];
   const args = [];
   if (game) { where.push("game = ?"); args.push(game); }
@@ -121,6 +123,7 @@ function list({ game, vibe, voice } = {}) {
   return db.get()
     .prepare(`SELECT * FROM lobbies WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT 100`)
     .all(...args)
+    .filter((lobby) => !viewer || !hasBlockWith(viewer, lobby.id))
     .map(summary);
 }
 
@@ -133,16 +136,29 @@ function detail(anonId, id) {
   out.isHost = lobby.host_anon_id === anonId;
   if (out.isMember) {
     const ign = db.get().prepare("SELECT in_game_name FROM profile_games WHERE anon_id = ? AND game = ?");
+    const mine = blocks.blockedBy(anonId);
     out.roster = memberIds(id).map((m) => ({
       username: usernameOf(m),
       avatar: avatarOf(m),
       inGameName: (ign.get(m, lobby.game) || {}).in_game_name || null,
+      isModerator: isModerator(m),
+      blocked: mine.has(m),
     }));
     out.discordInvite = lobby.state !== "open" ? lobby.discord_invite : null;
     out.hasDiscordInvite = Boolean(lobby.discord_invite);
-    out.messages = messages(id);
+    out.messages = messages(id, mine);
   }
   return out;
+}
+
+function hasBlockWith(anonId, id) {
+  const others = blocks.related(anonId);
+  return memberIds(id).some((m) => others.has(m));
+}
+
+function isModerator(anonId) {
+  const row = db.get().prepare("SELECT is_moderator FROM accounts WHERE anon_id = ?").get(anonId);
+  return Boolean(row && row.is_moderator);
 }
 
 function updateFullness(id) {
@@ -158,6 +174,8 @@ function join(anonId, id) {
   if (isMember(anonId, id)) return;
   requireReady(anonId);
   if (lobby.state !== "open") throw new ValidationError("This lobby isn't open.");
+  // Same wording as a missing lobby, so nobody learns they've been blocked.
+  if (hasBlockWith(anonId, id)) throw new ValidationError("You can't join this lobby.");
   db.get().prepare("INSERT INTO lobby_members (lobby_id, anon_id) VALUES (?, ?)").run(id, anonId);
   updateFullness(id);
 }
@@ -180,12 +198,19 @@ function leave(anonId, id) {
   updateFullness(id);
 }
 
-function messages(id) {
-  return db.get().prepare(`
-    SELECT m.id, p.username, m.body, m.created_at AS createdAt
-    FROM messages m LEFT JOIN profiles p ON p.anon_id = m.anon_id
-    WHERE m.lobby_id = ? ORDER BY m.id
-  `).all(id).map((m) => ({ ...m }));
+const MESSAGE_SQL = `
+  SELECT m.id, m.anon_id, p.username, m.body, m.created_at AS createdAt, a.is_moderator
+  FROM messages m LEFT JOIN profiles p ON p.anon_id = m.anon_id LEFT JOIN accounts a ON a.anon_id = m.anon_id`;
+
+function toMessage(m) {
+  return { id: m.id, username: m.username, body: m.body, createdAt: m.createdAt, isModerator: Boolean(m.is_moderator) };
+}
+
+// A lobby's chat, leaving out messages from anyone in `hide` (anon IDs).
+function messages(id, hide = new Set()) {
+  return db.get().prepare(`${MESSAGE_SQL} WHERE m.lobby_id = ? ORDER BY m.id`).all(id)
+    .filter((m) => !hide.has(m.anon_id))
+    .map(toMessage);
 }
 
 const recentPosts = new Map(); // anonId -> timestamps, for a simple rate limit
@@ -203,10 +228,7 @@ function postMessage(anonId, id, body) {
   const { lastInsertRowid } = db.get()
     .prepare("INSERT INTO messages (lobby_id, anon_id, body) VALUES (?, ?, ?)")
     .run(id, anonId, clean);
-  return db.get().prepare(`
-    SELECT m.id, p.username, m.body, m.created_at AS createdAt
-    FROM messages m LEFT JOIN profiles p ON p.anon_id = m.anon_id WHERE m.id = ?
-  `).get(lastInsertRowid);
+  return toMessage(db.get().prepare(`${MESSAGE_SQL} WHERE m.id = ?`).get(lastInsertRowid));
 }
 
 // Deletes chat from lobbies that closed more than `days` days ago.
@@ -222,5 +244,5 @@ function deleteOldChats(days) {
 
 module.exports = {
   create, list, detail, join, leave, close, postMessage, deleteOldChats,
-  activeLobbyId, isMember, NotFoundError, ForbiddenError, VIBES,
+  activeLobbyId, isMember, usernameOf, NotFoundError, ForbiddenError, VIBES,
 };

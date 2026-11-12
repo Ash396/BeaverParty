@@ -59,10 +59,14 @@ function getOwn(anonId) {
   };
 }
 
-// What other students see: no in-game names, and no anon ID.
+// What other students see: no in-game names, and no anon ID. Moderators
+// are labeled. Banned students' profiles are hidden.
 function getPublic(username) {
-  const row = db.get().prepare("SELECT anon_id FROM profiles WHERE username = ?").get(username);
-  if (!row) return null;
+  const row = db.get().prepare(`
+    SELECT p.anon_id, a.is_moderator, a.banned FROM profiles p JOIN accounts a ON a.anon_id = p.anon_id
+    WHERE p.username = ?
+  `).get(username);
+  if (!row || row.banned) return null;
   const own = getOwn(row.anon_id);
   return {
     username: own.username,
@@ -70,6 +74,7 @@ function getPublic(username) {
     dorm: own.dorm,
     avatar: own.avatar,
     games: own.games.map(({ game, rank }) => ({ game, rank })),
+    isModerator: Boolean(row.is_moderator),
   };
 }
 

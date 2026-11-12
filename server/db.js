@@ -102,6 +102,37 @@ const MIGRATIONS = [
   ALTER TABLE profiles ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'brown';
   ALTER TABLE profiles ADD COLUMN avatar_item TEXT NOT NULL DEFAULT 'none';
   `,
+  // 4: blocking, report details and outcomes, and warnings.
+  `
+  -- The blocked student is never told. See blocks.js for what a block does.
+  CREATE TABLE blocks (
+    blocker_anon_id TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    blocked_anon_id TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (blocker_anon_id, blocked_anon_id),
+    CHECK (blocker_anon_id <> blocked_anon_id)
+  );
+  CREATE INDEX blocks_blocked ON blocks(blocked_anon_id);
+
+  -- reason is one of moderation.REASONS; details is the reporter's own words.
+  -- On resolve, snapshot and details are deleted; reason, action, and who
+  -- resolved it stay so repeat problems and mass reporting can be counted.
+  ALTER TABLE reports ADD COLUMN details TEXT;
+  ALTER TABLE reports ADD COLUMN action TEXT CHECK (action IN ('dismissed', 'warned', 'banned'));
+  ALTER TABLE reports ADD COLUMN resolved_by TEXT;
+  CREATE INDEX reports_status ON reports(status, created_at);
+  CREATE INDEX reports_reported ON reports(reported_anon_id);
+  CREATE INDEX reports_reporter ON reports(reporter_anon_id, created_at);
+
+  -- Shown to the student once, on their next visit.
+  CREATE TABLE warnings (
+    id         INTEGER PRIMARY KEY,
+    anon_id    TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    reason     TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    seen_at    TEXT
+  );
+  `,
 ];
 
 let db = null;

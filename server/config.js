@@ -46,6 +46,8 @@ function loadConfig(env = process.env) {
       .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
     sessionDays: Number(env.SESSION_DAYS || 7),
     // SQLite database file. On Hyades this must be on a volume.
+    // Lobby chat is deleted this many days after the lobby closes.
+    chatRetentionDays: Number(env.CHAT_RETENTION_DAYS || 7),
     dbPath: env.DB_PATH || path.join(__dirname, "..", "data", "beaverparty.db"),
     // Test-only: after login, show the email, name, and affiliation Petrock
     // sent. Never turn this on where real users sign in.

@@ -13,7 +13,7 @@ test("migrations run once and survive reopening the file", () => {
   db.open(file);
   accounts.setBanned("a1", true);
   db.open(file);
-  assert.equal(db.get().prepare("PRAGMA user_version").get().user_version, 1);
+  assert.ok(db.get().prepare("PRAGMA user_version").get().user_version >= 2);
   assert.equal(accounts.find("a1").banned, true);
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });

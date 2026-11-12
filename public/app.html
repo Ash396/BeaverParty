@@ -22,8 +22,53 @@
     <section class="content">
       <!-- One section per page; app.js shows the one named in the URL after #. -->
       <div data-page="lobbies">
-        <h1>Lobbies</h1>
-        <p class="muted">Coming soon: browse and filter open lobbies by game, open slots, vibe, and voice; create your own.</p>
+        <!-- Shown while you're in a lobby -->
+        <div id="my-lobby" hidden>
+          <p><span id="lobby-state" class="badge"></span></p>
+          <h1 id="lobby-title"></h1>
+          <p id="lobby-meta" class="muted"></p>
+          <h2>Players</h2>
+          <ul id="lobby-roster" class="roster"></ul>
+          <p id="lobby-discord"></p>
+          <h2>Chat</h2>
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <form id="chat-form" class="chat-form">
+            <input name="body" maxlength="500" placeholder="Message" autocomplete="off" aria-label="Message">
+            <button type="submit">Send</button>
+          </form>
+          <p class="muted small">Chat is deleted 7 days after the lobby closes, unless it's reported.</p>
+          <p><button type="button" id="leave-lobby" class="secondary">Leave lobby</button>
+             <button type="button" id="close-lobby" class="secondary" hidden>Close lobby</button></p>
+          <p id="lobby-error" class="error" hidden></p>
+        </div>
+
+        <!-- Shown otherwise -->
+        <div id="browse-lobbies">
+          <h1>Lobbies</h1>
+          <details id="create-box" class="create-box">
+            <summary>Create a lobby</summary>
+            <form id="create-form" class="form">
+              <label>Game <select name="game" required></select></label>
+              <label id="other-game" hidden>Game name <input name="otherGame" maxlength="40"></label>
+              <label>Players (including you) <input name="slots" type="number" min="2" max="10" value="4" required></label>
+              <label>Vibe <select name="vibe"><option value="casual">Casual</option><option value="competitive">Competitive</option></select></label>
+              <label>Rank <span class="muted">(optional, e.g. "Gold+")</span> <input name="rank" maxlength="30"></label>
+              <label class="inline"><input name="voice" type="checkbox"> Voice chat on</label>
+              <label>Discord invite <span class="muted">(optional, shown to members once the lobby fills)</span>
+                <input name="discordInvite" placeholder="https://discord.gg/..." maxlength="100"></label>
+              <p id="create-error" class="error" hidden></p>
+              <p><button type="submit">Create</button></p>
+            </form>
+          </details>
+          <form id="filter-form" class="filters">
+            <select name="game" aria-label="Game"><option value="">All games</option></select>
+            <select name="vibe" aria-label="Vibe"><option value="">Any vibe</option><option value="casual">Casual</option><option value="competitive">Competitive</option></select>
+            <select name="voice" aria-label="Voice"><option value="">Voice on or off</option><option value="on">Voice on</option><option value="off">Voice off</option></select>
+          </form>
+          <div id="lobby-list" class="lobby-list"></div>
+          <p id="lobby-empty" class="muted" hidden>No open lobbies right now. Create one!</p>
+          <p id="join-error" class="error" hidden></p>
+        </div>
       </div>
       <div data-page="profile" hidden>
         <h1>My profile</h1>

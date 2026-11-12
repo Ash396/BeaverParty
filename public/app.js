@@ -144,7 +144,10 @@ async function loadLobbies() {
   document.getElementById("my-lobby").hidden = !myLobbyId;
   document.getElementById("browse-lobbies").hidden = Boolean(myLobbyId);
   if (myLobbyId) await renderMyLobby();
-  else renderList(data.lobbies);
+  else {
+    renderList(data.lobbies);
+    await loadRecent();
+  }
   connect();
 }
 
@@ -253,6 +256,39 @@ document.getElementById("create-form").addEventListener("submit", async (event) 
 
 document.getElementById("filter-form").addEventListener("change", () => loadLobbies());
 
+// ---- Endorsements for recently closed lobbies ----
+
+async function loadRecent() {
+  const { badges, lobbies } = await api("GET", "/api/endorsements");
+  document.getElementById("recent-games").hidden = lobbies.length === 0;
+  document.getElementById("recent-list").replaceChildren(...lobbies.map((lobby) => {
+    const closed = new Date(lobby.closedAt.replace(" ", "T") + "Z").toLocaleDateString([], { month: "short", day: "numeric" });
+    return el("div", { className: "lobby-card endorse-card" },
+      el("h3", { textContent: `${lobby.game} · ${closed}` }),
+      ...lobby.players.map((player) => endorseRow(lobby.id, player, badges)));
+  }));
+}
+
+function endorseRow(lobbyId, player, badges) {
+  const boxes = badges.map((badge) => el("input", { type: "checkbox", value: badge, checked: player.given.includes(badge) }));
+  const saved = el("span", { className: "muted small", textContent: "Saved", hidden: true });
+  const row = el("div", { className: "endorse-row" },
+    userLink(player.username),
+    ...boxes.map((box) => el("label", {}, box, box.value)),
+    saved);
+  row.addEventListener("change", async () => {
+    try {
+      await api("PUT", `/api/lobbies/${lobbyId}/endorsements`, {
+        username: player.username,
+        badges: boxes.filter((b) => b.checked).map((b) => b.value),
+      });
+      saved.hidden = false;
+      showError("endorse-error", null);
+    } catch (err) { showError("endorse-error", err); }
+  });
+  return row;
+}
+
 // ---- Someone's public profile ----
 
 async function loadUser(username) {
@@ -266,6 +302,8 @@ async function loadUser(username) {
     const { profile } = await api("GET", `/api/profiles/${encodeURIComponent(username)}`);
     name.textContent = profile.username;
     const rows = [["Games", profile.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ")]];
+    const earned = (profile.badges || []).filter((b) => b.count > 0);
+    rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);
     if (profile.realName) rows.push(["Real name", profile.realName]);
     if (profile.dorm) rows.push(["Dorm", profile.dorm]);
     for (const [k, v] of rows) details.append(el("dt", { textContent: k }), el("dd", { textContent: v }));

@@ -9,10 +9,13 @@
 //   POST /api/lobbies/:id/join | leave | close
 //   POST /api/lobbies/:id/messages        -> send a chat message
 //   GET  /api/events?lobby=:id            -> live updates (Server-Sent Events)
+//   GET  /api/endorsements                -> recently closed lobbies you can endorse from
+//   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
 const { GAMES, DORMS } = require("./catalog");
 const profiles = require("./profiles");
 const lobbies = require("./lobbies");
 const events = require("./events");
+const endorsements = require("./endorsements");
 const { currentAnonId } = require("./auth");
 
 const MAX_BODY = 16 * 1024;
@@ -55,6 +58,7 @@ async function handle(config, req, res, url) {
     // Every change must be sent as JSON (see readJson) so other sites can't
     // trigger it with a plain form.
     const body = req.method === "GET" ? null : await readJson(req);
+    const endorseMatch = p.match(/^\/api\/lobbies\/(\d+)\/endorsements$/);
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
@@ -65,7 +69,7 @@ async function handle(config, req, res, url) {
       json(res, 200, { profile: profiles.save(anonId, body) });
     } else if (req.method === "GET" && p.startsWith("/api/profiles/")) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
-      if (profile) json(res, 200, { profile });
+      if (profile) json(res, 200, { profile: { ...profile, badges: endorsements.counts(profile.username) } });
       else json(res, 404, { error: "No such user." });
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
@@ -91,6 +95,11 @@ async function handle(config, req, res, url) {
       events.publish("lobbies", "changed");
       events.publish(`lobby:${id}`, "changed");
       json(res, 200, { lobby: lobbies.detail(anonId, id) });
+    } else if (req.method === "GET" && p === "/api/endorsements") {
+      json(res, 200, { badges: endorsements.BADGES, lobbies: endorsements.pending(anonId) });
+    } else if (req.method === "PUT" && endorseMatch) {
+      const badges = endorsements.set(anonId, Number(endorseMatch[1]), body.username, body.badges);
+      json(res, 200, { badges });
     } else if (req.method === "GET" && p === "/api/events") {
       const channels = ["lobbies"];
       const lobbyId = Number(url.searchParams.get("lobby"));

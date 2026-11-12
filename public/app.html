@@ -36,7 +36,7 @@
             <input name="body" maxlength="500" placeholder="Message" autocomplete="off" aria-label="Message">
             <button type="submit">Send</button>
           </form>
-          <p class="muted small">Chat is deleted 7 days after the lobby closes, unless it's reported.</p>
+          <p class="muted small">Chat is deleted 7 days after the lobby closes, unless it's reported. Once it closes, you can endorse the other players.</p>
           <p><button type="button" id="leave-lobby" class="secondary">Leave lobby</button>
              <button type="button" id="close-lobby" class="secondary" hidden>Close lobby</button></p>
           <p id="lobby-error" class="error" hidden></p>
@@ -68,6 +68,12 @@
           <div id="lobby-list" class="lobby-list"></div>
           <p id="lobby-empty" class="muted" hidden>No open lobbies right now. Create one!</p>
           <p id="join-error" class="error" hidden></p>
+          <section id="recent-games" hidden>
+            <h2>Endorse your recent teammates</h2>
+            <p class="muted small">Give badges to players from lobbies that closed in the last 7 days. They see how many students gave each badge, never who.</p>
+            <div id="recent-list"></div>
+            <p id="endorse-error" class="error" hidden></p>
+          </section>
         </div>
       </div>
       <div data-page="profile" hidden>

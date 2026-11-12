@@ -73,3 +73,7 @@ button.secondary { background: var(--bg); color: var(--text); border-color: var(
 .chat-log .when { color: var(--muted); font-size: 0.8rem; margin-left: 0.4rem; }
 .chat-form { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
 .chat-form input { flex: 1; padding: 0.45rem; font: inherit; border: 1px solid var(--border); border-radius: 4px; }
+.endorse-card { display: block; margin-top: 0.75rem; }
+.endorse-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; padding: 0.35rem 0; }
+.endorse-row > a { min-width: 8rem; font-weight: bold; }
+.endorse-row label { display: inline-flex; gap: 0.3rem; align-items: center; }

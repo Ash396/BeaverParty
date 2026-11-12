@@ -39,6 +39,7 @@ function showPage() {
   if (target === "lobbies") loadLobbies();
   if (target === "profile") loadProfile();
   if (target === "user") loadUser(decodeURIComponent(arg || ""));
+  if (target === "moderation") loadModeration();
 }
 
 // ---- My profile ----
@@ -70,6 +71,8 @@ async function loadProfile() {
   avatarChoice = { ...(profile ? profile.avatar : { color: "brown", item: "none" }) };
   renderAvatarPicker();
   document.getElementById("delete-section").hidden = !profile;
+  document.getElementById("blocked-section").hidden = !profile;
+  if (profile) loadBlocked();
   document.getElementById("delete-error").hidden = true;
   document.getElementById("delete-form").reset();
 
@@ -139,6 +142,66 @@ document.getElementById("delete-form").addEventListener("submit", async (event) 
     await api("POST", "/api/account/delete", { confirm: event.target.elements.confirm.value });
     location.replace("/");
   } catch (err) { showError("delete-error", err); }
+});
+
+// ---- Blocking and reporting ----
+
+async function setBlocked(username, block) {
+  await api(block ? "PUT" : "DELETE", `/api/blocks/${encodeURIComponent(username)}`);
+}
+
+async function loadBlocked() {
+  const { blocked } = await api("GET", "/api/blocks");
+  document.getElementById("blocked-empty").hidden = blocked.length > 0;
+  document.getElementById("blocked-list").replaceChildren(...blocked.map((username) => {
+    const undo = el("button", { type: "button", className: "secondary small-button", textContent: "Unblock" });
+    undo.addEventListener("click", async () => { await setBlocked(username, false); loadBlocked(); });
+    return el("li", {}, userLink(username), undo);
+  }));
+}
+
+// Small Report / Block buttons for another player, e.g. in a lobby roster.
+function playerActions(username, { lobbyId = null, blocked = false, onChange } = {}) {
+  const report = el("button", { type: "button", className: "link-button", textContent: "Report" });
+  report.addEventListener("click", () => openReport(username, lobbyId, onChange));
+  const block = el("button", { type: "button", className: "link-button", textContent: blocked ? "Unblock" : "Block" });
+  block.addEventListener("click", async () => {
+    if (!blocked && !confirm(`Block ${username}? They won't be told.`)) return;
+    await setBlocked(username, !blocked);
+    if (onChange) onChange();
+  });
+  return el("span", { className: "player-actions" }, report, block);
+}
+
+let reportTarget = null;
+
+function openReport(username, lobbyId, onDone) {
+  reportTarget = { username, lobbyId, onDone };
+  const form = document.getElementById("report-form");
+  form.reset();
+  const reasons = form.elements.reason;
+  if (reasons.options.length === 1) for (const r of catalog.reportReasons) reasons.append(el("option", { value: r, textContent: r }));
+  document.getElementById("report-name").textContent = username;
+  document.getElementById("report-context").textContent = lobbyId
+    ? "A copy of this lobby's chat will be saved with the report."
+    : "This reports their profile (for example, an offensive username). To report something said in chat, report them from the lobby.";
+  showError("report-error", null);
+  document.getElementById("report-dialog").showModal();
+}
+
+document.getElementById("report-cancel").addEventListener("click", () => document.getElementById("report-dialog").close());
+
+document.getElementById("report-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const f = event.target.elements;
+  const { username, lobbyId, onDone } = reportTarget;
+  try {
+    await api("POST", "/api/reports", { username, lobbyId, reason: f.reason.value, details: f.details.value });
+    if (f.alsoBlock.checked) await setBlocked(username, true);
+    document.getElementById("report-dialog").close();
+    alert("Thanks. A moderator will look at your report.");
+    if (onDone) onDone();
+  } catch (err) { showError("report-error", err); }
 });
 
 // Avatar circles for a lobby's players, plus empty circles for open spots.
@@ -283,8 +346,16 @@ async function renderMyLobby() {
   document.getElementById("lobby-title").textContent = lobby.game;
   document.getElementById("lobby-meta").textContent = `Hosted by ${lobby.host} · ${describe(lobby)}`;
   document.getElementById("lobby-seats").replaceWith(Object.assign(seats(lobby), { id: "lobby-seats" }));
-  document.getElementById("lobby-roster").replaceChildren(...lobby.roster.map((r) =>
-    el("li", {}, beaverSvg(r.avatar, 28), presenceDot(r.username, r.online), userLink(r.username), r.inGameName ? ` (in game: ${r.inGameName})` : "")));
+  document.getElementById("lobby-roster").replaceChildren(...lobby.roster.map((r) => {
+    const li = el("li", {}, beaverSvg(r.avatar, 28), presenceDot(r.username, r.online), userLink(r.username));
+    if (r.isModerator) li.append(modBadge());
+    if (r.inGameName) li.append(` (in game: ${r.inGameName})`);
+    if (r.blocked) li.append(el("span", { className: "muted small", textContent: " blocked, chat hidden" }));
+    if (r.username && r.username !== me.username) {
+      li.append(playerActions(r.username, { lobbyId: lobby.id, blocked: r.blocked, onChange: renderMyLobby }));
+    }
+    return li;
+  }));
   const discord = document.getElementById("lobby-discord");
   if (lobby.discordInvite) {
     discord.replaceChildren("Discord: ", el("a", { href: lobby.discordInvite, textContent: lobby.discordInvite, target: "_blank", rel: "noopener noreferrer" }));
@@ -307,12 +378,18 @@ function playerColor(username) {
   return `p${(h >>> 0) % 4}`;
 }
 
+function modBadge() {
+  return el("span", { className: "badge mod", textContent: "Mod", title: "BeaverParty moderator" });
+}
+
 function addMessage(m) {
   const log = document.getElementById("chat-log");
   if (log.querySelector(`[data-id="${m.id}"]`)) return;
   const time = new Date(m.createdAt.replace(" ", "T") + "Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   log.append(el("p", { dataset: { id: m.id } },
-    el("span", { className: `who ${playerColor(m.username)}`, textContent: m.username || "(deleted)" }), m.body, el("span", { className: "when", textContent: time })));
+    el("span", { className: `who ${playerColor(m.username)}`, textContent: m.username || "(deleted)" }),
+    m.isModerator ? modBadge() : "", m.isModerator ? " " : "",
+    m.body, el("span", { className: "when", textContent: time })));
   log.scrollTop = log.scrollHeight;
 }
 document.getElementById("chat-form").addEventListener("submit", async (event) => {
@@ -377,7 +454,8 @@ function endorseRow(lobbyId, player, badges) {
   const row = el("div", { className: "endorse-row" },
     userLink(player.username),
     ...boxes.map((box) => el("label", {}, box, box.value)),
-    saved);
+    saved,
+    playerActions(player.username, { lobbyId, onChange: loadRecent }));
   row.addEventListener("change", async () => {
     try {
       await api("PUT", `/api/lobbies/${lobbyId}/endorsements`, {
@@ -400,6 +478,9 @@ async function loadUser(username) {
   name.textContent = username;
   details.replaceChildren();
   document.getElementById("user-avatar").replaceChildren();
+  document.getElementById("user-mod").hidden = true;
+  document.getElementById("user-actions").hidden = true;
+  document.getElementById("user-action-note").hidden = true;
   const status = document.getElementById("user-status");
   status.textContent = "";
   status.dataset.user = "";
@@ -407,6 +488,20 @@ async function loadUser(username) {
   try {
     const { profile } = await api("GET", `/api/profiles/${encodeURIComponent(username)}`);
     name.textContent = profile.username;
+    document.getElementById("user-mod").hidden = !profile.isModerator;
+    const mine = profile.username === me.username;
+    document.getElementById("user-actions").hidden = mine;
+    const block = document.getElementById("user-block");
+    block.textContent = profile.blockedByMe ? "Unblock" : "Block";
+    block.onclick = async () => {
+      if (!profile.blockedByMe && !confirm(`Block ${profile.username}? They won't be told.`)) return;
+      await setBlocked(profile.username, !profile.blockedByMe);
+      loadUser(profile.username);
+    };
+    document.getElementById("user-report").onclick = () => openReport(profile.username, null);
+    const note = document.getElementById("user-action-note");
+    note.hidden = !profile.blockedByMe;
+    note.textContent = "You blocked this player. They aren't told.";
     document.getElementById("user-avatar").replaceChildren(beaverSvg(profile.avatar, 72));
     status.dataset.user = profile.username;
     status.textContent = profile.online ? "Online now" : "Offline";
@@ -421,6 +516,100 @@ async function loadUser(username) {
   }
 }
 
+// ---- Moderation (moderators only) ----
+
+function shortDate(sqlTime) {
+  if (!sqlTime) return "";
+  return new Date(sqlTime.replace(" ", "T") + "Z").toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+async function loadModeration() {
+  let data;
+  try {
+    data = await api("GET", "/api/moderation");
+    showError("mod-error", null);
+  } catch (err) { return showError("mod-error", err); }
+  document.getElementById("mod-count").textContent = data.reports.length;
+  document.getElementById("mod-empty").hidden = data.reports.length > 0;
+  document.getElementById("mod-reports").replaceChildren(...data.reports.map(reportCard));
+
+  document.getElementById("mod-banned-empty").hidden = data.banned.length > 0;
+  document.getElementById("mod-banned").replaceChildren(...data.banned.map((username) => {
+    const lift = el("button", { type: "button", className: "secondary small-button", textContent: "Lift ban" });
+    lift.addEventListener("click", async () => {
+      if (!confirm(`Lift the ban on ${username}? They'll be able to sign in again.`)) return;
+      try { await api("POST", "/api/moderation/unban", { username }); loadModeration(); } catch (err) { showError("mod-error", err); }
+    });
+    return el("li", {}, el("span", { textContent: username }), lift);
+  }));
+
+  document.getElementById("mod-history").hidden = data.history.length === 0;
+  const head = el("tr", {}, ...["When", "Reason", "Decision", "Moderator"].map((h) => el("th", { textContent: h })));
+  document.getElementById("mod-history").replaceChildren(head, ...data.history.map((h) =>
+    el("tr", {}, ...[shortDate(h.resolvedAt), h.reason, h.action, h.moderator || "(former moderator)"].map((v) => el("td", { textContent: v })))));
+}
+
+function reportCard(r) {
+  const f = r.flags;
+  const flags = [];
+  if (f.openReportsAboutThem > 1) flags.push(`${plural(f.openReportsAboutThem, "student")} reported them`);
+  if (f.pastWarnings) flags.push(`warned ${plural(f.pastWarnings, "time")} before`);
+  if (f.reporterReportsLast30Days >= 5) flags.push(`this reporter filed ${f.reporterReportsLast30Days} reports in 30 days`);
+  if (f.reporterDismissed >= 2) flags.push(`${f.reporterDismissed} of this reporter's past reports were dismissed`);
+
+  const who = r.accountDeleted ? `${r.usernameWhenReported} (account deleted)` : r.username;
+  const renamed = !r.accountDeleted && r.usernameWhenReported && r.usernameWhenReported !== r.username
+    ? ` (was ${r.usernameWhenReported} when reported)` : "";
+  const card = el("div", { className: "lobby-card report-card" },
+    el("p", {}, el("span", { className: "badge", textContent: r.reason }), " ", el("span", { className: "muted small", textContent: shortDate(r.createdAt) })),
+    el("h3", { textContent: who + renamed }),
+    el("p", { className: "small muted", textContent: r.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ") }));
+  if (flags.length) card.append(el("p", { className: "small flag", textContent: `Note: ${flags.join("; ")}.` }));
+  if (r.details) card.append(el("blockquote", { textContent: r.details }));
+  if (r.lobby) {
+    card.append(el("p", { className: "small", textContent: `${r.lobby.game} lobby, ${shortDate(r.lobby.createdAt)}` }));
+    const log = el("div", { className: "chat-log saved" });
+    if (!r.messages.length) log.append(el("p", { className: "muted", textContent: "No chat messages." }));
+    for (const m of r.messages) {
+      log.append(el("p", { className: m.reported ? "reported" : "" },
+        el("span", { className: `who ${m.reported ? "p2" : "p3"}`, textContent: m.who }), m.body,
+        el("span", { className: "when", textContent: shortDate(m.createdAt) })));
+    }
+    card.append(log);
+  } else {
+    card.append(el("p", { className: "small muted", textContent: "Profile report (no lobby chat)." }));
+  }
+  const buttons = [
+    ["dismiss", "Dismiss", "secondary", null],
+    ["warn", "Warn", "secondary", `Warn ${who}? They'll see a notice next time they open BeaverParty.`],
+    ["ban", "Ban", "danger", `Ban ${who}? They'll be signed out right away and can't sign in again until a moderator lifts it. This resolves every open report about them.`],
+  ].map(([action, label, cls, question]) => {
+    const b = el("button", { type: "button", className: cls, textContent: label });
+    b.addEventListener("click", async () => {
+      if (question && !confirm(question)) return;
+      try { await api("POST", `/api/moderation/reports/${r.id}`, { action }); loadModeration(); } catch (err) { showError("mod-error", err); }
+    });
+    return b;
+  });
+  card.append(el("p", { className: "actions" }, ...buttons));
+  return card;
+}
+
+// ---- Warnings ----
+
+function showWarning(warning) {
+  const box = document.getElementById("warning");
+  box.hidden = !warning;
+  if (warning) document.getElementById("warning-text").textContent = `Reason: ${warning.reason}.`;
+}
+
+document.getElementById("warning-ok").addEventListener("click", async () => {
+  await api("POST", "/api/warnings/seen");
+  showWarning(null);
+});
+
 // ---- Start ----
 
 fetch("/api/me")
@@ -429,9 +618,13 @@ fetch("/api/me")
     if (!data.signedIn) return location.replace("/");
     me = data;
     document.getElementById("nav-moderation").hidden = !me.isModerator;
-    showPage();
-    renderMyStatus();
-    if (me.username) connect(); // having the app open on any page is what shows you as online
+    showWarning(me.warning);
+    return api("GET", "/api/catalog").then((c) => {
+      catalog = c;
+      showPage();
+      renderMyStatus();
+      if (me.username) connect(); // having the app open on any page is what shows you as online
+    });
   })
   .catch(() => location.replace("/"));
 

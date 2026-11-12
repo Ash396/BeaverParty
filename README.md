@@ -37,6 +37,14 @@ npm run set-moderator -- someone@mit.edu --remove
 
 The email is only used to compute the anonymous ID and isn't stored.
 
+### Blocking, reports, and moderation
+
+- **Block** (from a profile or a lobby roster): the blocked student isn't told. Neither sees lobbies the other is in or can join them, they can't endorse each other, and the blocker stops seeing the other's chat messages. Unblock from My profile.
+- **Report** (from a lobby roster, a recent lobby, or a profile): pick a reason, add details if you want. The report saves a copy of the reported username and the lobby chat. The reported student never learns who reported them, and neither do moderators.
+- **Moderation page** (moderators only): open reports with the saved chat. Moderators see usernames and chat, never real names, dorms, or anonymous IDs. In the chat copy, everyone except the reported student is "Player 1", "Player 2", and so on. The queue flags students reported by several people, past warnings, and reporters who file many reports or many that get dismissed. Moderators don't see reports about themselves or that they filed.
+- **Decisions**: Dismiss, Warn (shown to the student once, next time they open the app), or Ban (signed out at once, can't sign in again, profile hidden, all their open reports resolved). Resolving deletes the saved copy and details; only the reason, decision, moderator, and date are kept. Bans can be lifted from the same page.
+- Moderators are labeled "Mod" in lobbies and "Moderator" on their profile.
+
 ### Tests
 
 ```sh
@@ -91,6 +99,8 @@ server/     The Node.js server
   session.js  signed cookies
   db.js       SQLite database and table definitions (all keyed by anonymous ID)
   accounts.js accounts: banned and moderator flags
+  blocks.js   blocking
+  moderation.js reports, the moderation queue, warnings, and bans
   profiles.js profiles: username, games, opt-in real name and dorm
   catalog.js  fixed game and dorm lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
@@ -106,4 +116,4 @@ test/       Tests (npm test)
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). Auth, Profile, Lobby, Presence, and Endorsement are built. The Key Service is built too. Still to come: reports and moderation, and the heat map.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All but the heat map's data are built: Auth, Profile, Lobby, Presence, Endorsement, and Moderation, plus blocking. The Key Service is built too. Still to come: the heat map, and maybe friends.

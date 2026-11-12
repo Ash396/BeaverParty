@@ -32,11 +32,13 @@ function remove(sub) {
   for (const name of sub.names) channels.get(name)?.delete(sub);
 }
 
-function publish(name, event, data = {}) {
+// `except` is a set of anon IDs who shouldn't get this event (e.g. people
+// who blocked the sender of a chat message).
+function publish(name, event, data = {}, except = null) {
   const subs = channels.get(name);
   if (!subs) return;
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-  for (const sub of subs) write(sub, payload);
+  for (const sub of subs) if (!except || !except.has(sub.anonId)) write(sub, payload);
 }
 
 // Cut someone off from a lobby's channel, e.g. after they leave it.

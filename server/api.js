@@ -14,6 +14,14 @@
 //   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
 //   PUT  /api/status                     -> {invisible} appear offline to everyone, or not
 //   POST /api/account/delete              -> {confirm: username} delete your account
+//   GET  /api/blocks                      -> usernames you've blocked
+//   PUT | DELETE /api/blocks/:username    -> block or unblock someone
+//   POST /api/reports                     -> {username, lobbyId?, reason, details?} report someone
+//   POST /api/warnings/seen               -> dismiss the warning notice
+// Moderators only:
+//   GET  /api/moderation                  -> open reports, banned students, recent decisions
+//   POST /api/moderation/reports/:id      -> {action: dismiss | warn | ban}
+//   POST /api/moderation/unban            -> {username}
 const { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
 const { deleteAccount } = require("./deletion");
 const { cookie } = require("./session");
@@ -23,12 +31,16 @@ const events = require("./events");
 const presence = require("./presence");
 const db = require("./db");
 
-// Tell everyone signed in when someone appears or disappears, so dots update live.
+const endorsements = require("./endorsements");
+const blocks = require("./blocks");
+
+// Tell everyone signed in when someone appears or disappears, so dots update
+// live. Not people they have a block with, either way.
 presence.setListener((anonId, online) => {
   const row = db.get().prepare("SELECT username FROM profiles WHERE anon_id = ?").get(anonId);
-  if (row) events.publish("lobbies", "presence", { username: row.username, online });
+  if (row) events.publish("lobbies", "presence", { username: row.username, online }, blocks.related(anonId));
 });
-const endorsements = require("./endorsements");
+const moderation = require("./moderation");
 const { currentAnonId } = require("./auth");
 
 const MAX_BODY = 16 * 1024;
@@ -72,12 +84,14 @@ async function handle(config, req, res, url) {
     // trigger it with a plain form.
     const body = req.method === "GET" ? null : await readJson(req);
     const endorseMatch = p.match(/^\/api\/lobbies\/(\d+)\/endorsements$/);
+    const blockMatch = p.match(/^\/api\/blocks\/([^/]+)$/);
+    const reportMatch = p.match(/^\/api\/moderation\/reports\/(\d+)$/);
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
       json(res, 200, {
         games: GAMES, dorms: DORMS, vibes: lobbies.VIBES,
-        avatarColors: AVATAR_COLORS, avatarItems: AVATAR_ITEMS,
+        avatarColors: AVATAR_COLORS, avatarItems: AVATAR_ITEMS, reportReasons: moderation.REASONS,
       });
     } else if (req.method === "GET" && p === "/api/profile") {
       json(res, 200, { profile: profiles.getOwn(anonId) });
@@ -85,12 +99,21 @@ async function handle(config, req, res, url) {
       json(res, 200, { profile: profiles.save(anonId, body) });
     } else if (req.method === "GET" && p.startsWith("/api/profiles/")) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
-      if (profile) json(res, 200, { profile: { ...profile, badges: endorsements.counts(profile.username) } });
+      if (profile) {
+        // Someone you have a block with (either way) always looks offline.
+        const blocked = profile.online && blocks.between(anonId, profiles.anonIdOf(profile.username));
+        json(res, 200, { profile: {
+          ...profile,
+          online: profile.online && !blocked,
+          badges: endorsements.counts(profile.username),
+          blockedByMe: blocks.list(anonId).includes(profile.username),
+        } });
+      }
       else json(res, 404, { error: "No such user." });
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
       json(res, 200, {
-        lobbies: lobbies.list({ game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice") }),
+        lobbies: lobbies.list({ game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice") }, anonId),
         myLobbyId: lobbies.activeLobbyId(anonId),
       });
     } else if (req.method === "POST" && p === "/api/lobbies") {
@@ -102,7 +125,8 @@ async function handle(config, req, res, url) {
     } else if (req.method === "POST" && lobbyMatch && lobbyMatch[2] === "messages") {
       const id = Number(lobbyMatch[1]);
       const message = lobbies.postMessage(anonId, id, body && body.body);
-      events.publish(`lobby:${id}`, "message", message);
+      // People who blocked the sender don't get it.
+      events.publish(`lobby:${id}`, "message", message, blocks.blockers(anonId));
       json(res, 201, { message });
     } else if (req.method === "POST" && lobbyMatch && lobbyMatch[2]) {
       const id = Number(lobbyMatch[1]);
@@ -140,6 +164,36 @@ async function handle(config, req, res, url) {
     } else if (req.method === "PUT" && endorseMatch) {
       const badges = endorsements.set(anonId, Number(endorseMatch[1]), body.username, body.badges);
       json(res, 200, { badges });
+    } else if (req.method === "GET" && p === "/api/blocks") {
+      json(res, 200, { blocked: blocks.list(anonId) });
+    } else if ((req.method === "PUT" || req.method === "DELETE") && blockMatch) {
+      const username = decodeURIComponent(blockMatch[1]);
+      if (req.method === "PUT") blocks.block(anonId, username);
+      else blocks.unblock(anonId, username);
+      events.publish("lobbies", "changed");
+      json(res, 200, { blocked: blocks.list(anonId) });
+    } else if (req.method === "POST" && p === "/api/reports") {
+      moderation.report(anonId, body);
+      json(res, 201, { reported: true });
+    } else if (req.method === "POST" && p === "/api/warnings/seen") {
+      moderation.ackWarnings(anonId);
+      json(res, 200, { ok: true });
+    } else if (req.method === "GET" && p === "/api/moderation") {
+      json(res, 200, {
+        reports: moderation.queue(anonId),
+        banned: moderation.bannedList(anonId),
+        history: moderation.history(anonId),
+      });
+    } else if (req.method === "POST" && reportMatch) {
+      const banned = moderation.resolve(anonId, Number(reportMatch[1]), body.action);
+      if (banned) {
+        events.kickEverywhere(banned);
+        events.publish("lobbies", "changed");
+      }
+      json(res, 200, { ok: true });
+    } else if (req.method === "POST" && p === "/api/moderation/unban") {
+      moderation.unban(anonId, body.username);
+      json(res, 200, { banned: moderation.bannedList(anonId) });
     } else if (req.method === "GET" && p === "/api/events") {
       const channels = ["lobbies"];
       const lobbyId = Number(url.searchParams.get("lobby"));

@@ -163,3 +163,30 @@ button.choice[aria-pressed="true"] { border-color: var(--primary); }
 .danger-zone h2 { color: var(--danger); margin: 0.5rem 0; }
 button.danger { background: var(--danger); border-color: var(--danger); color: var(--on-primary); }
 :root[data-theme="light"] button.danger { color: #fff; }
+
+/* Blocking, reporting, and moderation */
+.badge.mod { color: var(--mint); text-transform: none; font-size: 0.75rem; margin-left: 0.35rem; vertical-align: middle; }
+.player-actions { margin-left: auto; display: inline-flex; gap: 0.75rem; }
+button.link-button { background: none; border: none; padding: 0; color: var(--muted); font-weight: normal; font-size: 0.85rem; text-decoration: underline; }
+button.link-button:hover { color: var(--text); }
+button.small-button { padding: 0.2rem 0.6rem; font-size: 0.85rem; }
+.plain-list { list-style: none; padding-left: 0; }
+.plain-list li { display: flex; align-items: center; gap: 0.75rem; margin: 0.35rem 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+textarea { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font: inherit; display: block; width: 100%; max-width: 360px; padding: 0.4rem; margin-top: 0.25rem; }
+dialog.dialog { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 1.25rem; width: min(440px, calc(100vw - 32px)); }
+dialog.dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+dialog.dialog h2 { margin: 0.75rem 0 0.25rem; overflow-wrap: anywhere; }
+.notice.warning { border-left-color: var(--danger); margin-bottom: 1.5rem; }
+.notice.warning p { margin: 0.4rem 0; }
+.report-card { display: block; margin-bottom: 1rem; }
+.report-card h3 { overflow-wrap: anywhere; }
+.report-card blockquote { margin: 0.5rem 0; padding: 0.4rem 0.75rem; border-left: 3px solid var(--border); background: var(--surface-2); border-radius: 0 6px 6px 0; overflow-wrap: anywhere; }
+.report-card .flag { color: var(--highlight); }
+.chat-log.saved { height: auto; max-height: 260px; margin: 0.5rem 0; background: var(--bg); }
+.chat-log.saved p.reported { background: color-mix(in srgb, var(--danger) 12%, transparent); border-radius: 4px; padding: 0 0.25rem; }
+#mod-history td, #mod-history th { padding-right: 1.25rem; }
+@media (max-width: 720px) {
+  .roster li { flex-wrap: wrap; }
+  #mod-history { display: block; overflow-x: auto; }
+}

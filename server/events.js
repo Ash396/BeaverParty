@@ -51,6 +51,11 @@ function kick(name, anonId) {
   }
 }
 
+// Close every live connection someone has, e.g. after they delete their account.
+function kickEverywhere(anonId) {
+  for (const name of [...channels.keys()]) kick(name, anonId);
+}
+
 function closeAll() {
   for (const subs of channels.values()) {
     for (const sub of subs) {
@@ -61,4 +66,4 @@ function closeAll() {
   channels.clear();
 }
 
-module.exports = { subscribe, publish, kick, closeAll };
+module.exports = { subscribe, publish, kick, kickEverywhere, closeAll };

@@ -67,6 +67,12 @@ async function loadProfile() {
     return el("div", { className: "game-row" }, el("label", {}, check, game), rank, ign);
   }));
 
+  avatarChoice = { ...(profile ? profile.avatar : { color: "brown", item: "none" }) };
+  renderAvatarPicker();
+  document.getElementById("delete-section").hidden = !profile;
+  document.getElementById("delete-error").hidden = true;
+  document.getElementById("delete-form").reset();
+
   form.elements.username.value = profile ? profile.username : "";
   form.elements.realName.value = (profile && profile.realName) || "";
   dorm.value = (profile && profile.dorm) || "";
@@ -90,6 +96,7 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
       username: form.elements.username.value,
       realName: form.elements.realName.value,
       dorm: form.elements.dorm.value,
+      avatar: avatarChoice,
       games,
     });
     const firstTime = !me.username;
@@ -106,6 +113,45 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
     error.hidden = false;
   }
 });
+
+let avatarChoice = { color: "brown", item: "none" };
+
+function renderAvatarPicker() {
+  document.getElementById("avatar-preview").replaceChildren(beaverSvg(avatarChoice, 96));
+  const row = (id, key, values) => document.getElementById(id).replaceChildren(...values.map((value) => {
+    const button = el("button", {
+      type: "button", className: "choice", title: AVATAR_LABELS[value],
+      ariaPressed: String(avatarChoice[key] === value), ariaLabel: AVATAR_LABELS[value],
+    }, beaverSvg({ ...avatarChoice, [key]: value }, 40));
+    button.addEventListener("click", () => { avatarChoice[key] = value; renderAvatarPicker(); });
+    return button;
+  }));
+  row("avatar-colors", "color", catalog.avatarColors);
+  row("avatar-items", "item", catalog.avatarItems);
+}
+
+document.getElementById("delete-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!confirm("Delete your BeaverParty account? This can't be undone.")) return;
+  try {
+    await api("POST", "/api/account/delete", { confirm: event.target.elements.confirm.value });
+    location.replace("/");
+  } catch (err) { showError("delete-error", err); }
+});
+
+// Avatar circles for a lobby's players, plus empty circles for open spots.
+function seats(lobby) {
+  const row = el("div", { className: "seats", ariaLabel: `${lobby.members.length} of ${lobby.slots} spots taken` });
+  for (let i = 0; i < lobby.slots; i++) {
+    const seat = el("span", { className: i < lobby.members.length ? "seat filled" : "seat" });
+    if (i < lobby.members.length) {
+      seat.title = lobby.members[i];
+      seat.append(beaverSvg(lobby.avatars[i], 30));
+    }
+    row.append(seat);
+  }
+  return row;
+}
 
 // ---- Lobbies ----
 
@@ -179,7 +225,7 @@ function renderList(list) {
     const members = el("p", { className: "small" }, "Players: ");
     lobby.members.forEach((m, i) => members.append(i ? ", " : "", userLink(m)));
     return el("div", { className: "lobby-card" },
-      el("div", {}, el("h3", { textContent: lobby.game }), el("p", { className: "muted", textContent: describe(lobby) }), members),
+      el("div", {}, el("h3", { textContent: lobby.game }), el("p", { className: "muted", textContent: describe(lobby) }), seats(lobby), members),
       join);
   }));
 }
@@ -189,8 +235,9 @@ async function renderMyLobby() {
   document.getElementById("lobby-state").textContent = lobby.state;
   document.getElementById("lobby-title").textContent = lobby.game;
   document.getElementById("lobby-meta").textContent = `Hosted by ${lobby.host} · ${describe(lobby)}`;
+  document.getElementById("lobby-seats").replaceWith(Object.assign(seats(lobby), { id: "lobby-seats" }));
   document.getElementById("lobby-roster").replaceChildren(...lobby.roster.map((r) =>
-    el("li", {}, userLink(r.username), r.inGameName ? ` (in game: ${r.inGameName})` : "")));
+    el("li", {}, beaverSvg(r.avatar, 28), userLink(r.username), r.inGameName ? ` (in game: ${r.inGameName})` : "")));
   const discord = document.getElementById("lobby-discord");
   if (lobby.discordInvite) {
     discord.replaceChildren("Discord: ", el("a", { href: lobby.discordInvite, textContent: lobby.discordInvite, target: "_blank", rel: "noopener noreferrer" }));
@@ -305,10 +352,12 @@ async function loadUser(username) {
   const missing = document.getElementById("user-missing");
   name.textContent = username;
   details.replaceChildren();
+  document.getElementById("user-avatar").replaceChildren();
   missing.hidden = true;
   try {
     const { profile } = await api("GET", `/api/profiles/${encodeURIComponent(username)}`);
     name.textContent = profile.username;
+    document.getElementById("user-avatar").replaceChildren(beaverSvg(profile.avatar, 72));
     const rows = [["Games", profile.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ")]];
     const earned = (profile.badges || []).filter((b) => b.count > 0);
     rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);

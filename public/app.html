@@ -32,6 +32,7 @@
           <p><span id="lobby-state" class="badge"></span></p>
           <h1 id="lobby-title"></h1>
           <p id="lobby-meta" class="muted"></p>
+          <div id="lobby-seats" class="seats"></div>
           <h2>Players</h2>
           <ul id="lobby-roster" class="roster"></ul>
           <p id="lobby-discord"></p>
@@ -89,6 +90,18 @@
             <input name="username" required minlength="3" maxlength="20" pattern="[A-Za-z0-9_\-]+" autocomplete="off">
           </label>
           <fieldset>
+            <legend>Avatar <span class="muted">(always shown)</span></legend>
+            <div class="avatar-picker">
+              <div id="avatar-preview" class="avatar-preview"></div>
+              <div>
+                <p class="small muted">Fur</p>
+                <div id="avatar-colors" class="choice-row"></div>
+                <p class="small muted">Accessory</p>
+                <div id="avatar-items" class="choice-row"></div>
+              </div>
+            </div>
+          </fieldset>
+          <fieldset>
             <legend>Games you play <span class="muted">(always shown)</span></legend>
             <p class="muted small">Rank is optional and shown on your profile. In-game name is only shown to people in your lobbies for that game.</p>
             <div id="game-list"></div>
@@ -103,10 +116,20 @@
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
           <p id="preview-link" hidden><a href="#">See what other students see</a></p>
         </form>
+        <section id="delete-section" class="danger-zone" hidden>
+          <h2>Delete account</h2>
+          <p class="small">This removes your profile, games, avatar, chat messages, endorsements, and any lobbies you hosted. It can't be undone. You can sign in again later and start fresh.</p>
+          <p class="small muted">If a report that names you is still open, we keep only your anonymous ID (no profile or messages) until a moderator resolves it.</p>
+          <form id="delete-form" class="form">
+            <label>Type your username to confirm <input name="confirm" autocomplete="off"></label>
+            <p id="delete-error" class="error" hidden></p>
+            <p><button type="submit" class="danger">Delete my account</button></p>
+          </form>
+        </section>
       </div>
       <div data-page="user" hidden>
         <p><a href="#profile" id="back-link">&larr; Back</a></p>
-        <h1 id="user-name"></h1>
+        <div class="user-head"><span id="user-avatar"></span><h1 id="user-name"></h1></div>
         <dl id="user-details" class="details"></dl>
         <p id="user-missing" hidden>No student with that username.</p>
       </div>
@@ -120,6 +143,7 @@
       </div>
     </section>
   </div>
+  <script src="avatar.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

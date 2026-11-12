@@ -97,6 +97,11 @@ const MIGRATIONS = [
   CREATE INDEX lobby_members_anon ON lobby_members(anon_id);
   CREATE INDEX messages_lobby ON messages(lobby_id, id);
   `,
+  // 3: pixel beaver avatars (see catalog.js).
+  `
+  ALTER TABLE profiles ADD COLUMN avatar_color TEXT NOT NULL DEFAULT 'brown';
+  ALTER TABLE profiles ADD COLUMN avatar_item TEXT NOT NULL DEFAULT 'none';
+  `,
 ];
 
 let db = null;

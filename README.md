@@ -84,6 +84,7 @@ public/     The web pages (HTML, CSS, JS) the browser loads
   app.html    the app: sidebar (bottom tabs on phones) + Lobbies, My profile, Heat map, Moderation
   style.css   shared styles; the team palette and dark/light colors are variables at the top
   theme.js    dark mode by default, with a light mode toggle remembered in the browser
+  avatar.js   pixel beaver avatars (fur color + accessory), drawn as SVG
 server/     The Node.js server
   auth.js     sign-in routes (/auth/login, /auth/callback, /auth/logout, /api/me)
   oidc.js     talks to Petrock: code exchange, ID token check, userinfo
@@ -97,6 +98,7 @@ server/     The Node.js server
   events.js   live updates to browsers over Server-Sent Events
   endorsements.js badges players give each other after a lobby closes
   keyservice.js the Key Service: holds ANON_ID_KEY, turns emails into anonymous IDs
+  deletion.js deleting your account (keeps only the bare ID row while a report naming you is open)
   config.js   settings from environment variables or .env
 test/       Tests (npm test)
 ```

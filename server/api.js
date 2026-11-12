@@ -11,7 +11,10 @@
 //   GET  /api/events?lobby=:id            -> live updates (Server-Sent Events)
 //   GET  /api/endorsements                -> recently closed lobbies you can endorse from
 //   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
-const { GAMES, DORMS } = require("./catalog");
+//   POST /api/account/delete              -> {confirm: username} delete your account
+const { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
+const { deleteAccount } = require("./deletion");
+const { cookie } = require("./session");
 const profiles = require("./profiles");
 const lobbies = require("./lobbies");
 const events = require("./events");
@@ -62,7 +65,10 @@ async function handle(config, req, res, url) {
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
-      json(res, 200, { games: GAMES, dorms: DORMS, vibes: lobbies.VIBES });
+      json(res, 200, {
+        games: GAMES, dorms: DORMS, vibes: lobbies.VIBES,
+        avatarColors: AVATAR_COLORS, avatarItems: AVATAR_ITEMS,
+      });
     } else if (req.method === "GET" && p === "/api/profile") {
       json(res, 200, { profile: profiles.getOwn(anonId) });
     } else if (req.method === "PUT" && p === "/api/profile") {
@@ -95,6 +101,22 @@ async function handle(config, req, res, url) {
       events.publish("lobbies", "changed");
       events.publish(`lobby:${id}`, "changed");
       json(res, 200, { lobby: lobbies.detail(anonId, id) });
+    } else if (req.method === "POST" && p === "/api/account/delete") {
+      // You must type your username to confirm (or "delete" if you have no profile).
+      const own = profiles.getOwn(anonId);
+      const expected = own ? own.username.toLowerCase() : "delete";
+      if (String(body.confirm || "").trim().toLowerCase() !== expected) {
+        throw new profiles.ValidationError(own ? "Type your username to confirm." : 'Type "delete" to confirm.');
+      }
+      deleteAccount(anonId);
+      events.kickEverywhere(anonId);
+      events.publish("lobbies", "changed");
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Set-Cookie": cookie("bp_session", "", { maxAgeSeconds: 0, secure: config.secureCookies }),
+      });
+      res.end(JSON.stringify({ deleted: true }));
     } else if (req.method === "GET" && p === "/api/endorsements") {
       json(res, 200, { badges: endorsements.BADGES, lobbies: endorsements.pending(anonId) });
     } else if (req.method === "PUT" && endorseMatch) {

@@ -11,7 +11,7 @@ const BEAVER_FUR = {
 };
 const AVATAR_LABELS = {
   brown: "Classic", tomato: "Tomato", gold: "Gold", mint: "Mint", sapphire: "Sapphire", grey: "Grey",
-  none: "Nothing", headset: "Headset", cap: "Cap", glasses: "Glasses", crown: "Crown", bow: "Bow",
+  none: "Nothing", headset: "Headset", cap: "Cap", glasses: "Sunglasses", crown: "Crown", bow: "Bow",
 };
 
 // A sitting beaver on a 24x24 grid, tail to the right.
@@ -69,10 +69,9 @@ const ITEMS = {
   ],
   glasses: [
     "", "", "", "", "", "",
-    "...GGGG......GGGG.......",
-    "...G..GGGGGGGG..G.......",
-    "...G..G......G..G.......",
-    "...G..G......G..G.......",
+    "",
+    ".GGGGGGGGGGGGGGGGGG.....",
+    "..GSGGGG....GSGGGG......",
     "...GGGG......GGGG.......",
   ],
   crown: [
@@ -89,7 +88,7 @@ const ITEMS = {
 const ITEM_COLORS = {
   H: "#6B646B", E: "#4CFCA7", M: "#6B646B",
   C: "#22307A", S: "#FFFFFF", B: "#3049D9",
-  G: "#1C181C",
+  G: "#121012",
   Y: "#FFC14D", R: "#FF6A4D",
   P: "#FF8FB1", Q: "#E0577F",
 };

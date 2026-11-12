@@ -5,7 +5,7 @@
 // or full lobby at a time.
 const db = require("./db");
 const { GAMES } = require("./catalog");
-const { ValidationError } = require("./profiles");
+const { ValidationError, avatarOf } = require("./profiles");
 
 const VIBES = ["casual", "competitive"];
 const MAX_SLOTS = 10;
@@ -106,6 +106,7 @@ function summary(lobby) {
     state: lobby.state,
     host: usernameOf(lobby.host_anon_id),
     members: members.map(usernameOf),
+    avatars: members.map(avatarOf),
     createdAt: lobby.created_at,
   };
 }
@@ -134,6 +135,7 @@ function detail(anonId, id) {
     const ign = db.get().prepare("SELECT in_game_name FROM profile_games WHERE anon_id = ? AND game = ?");
     out.roster = memberIds(id).map((m) => ({
       username: usernameOf(m),
+      avatar: avatarOf(m),
       inGameName: (ign.get(m, lobby.game) || {}).in_game_name || null,
     }));
     out.discordInvite = lobby.state !== "open" ? lobby.discord_invite : null;

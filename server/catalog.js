@@ -39,4 +39,10 @@ const DORMS = [
   "Off campus",
 ];
 
-module.exports = { GAMES, DORMS };
+// Pixel beaver avatars: a fur color and an accessory. Picked from fixed
+// lists (no uploads), so avatars can't identify anyone and need no moderation.
+// public/avatar.js draws them.
+const AVATAR_COLORS = ["brown", "tomato", "gold", "mint", "sapphire", "grey"];
+const AVATAR_ITEMS = ["none", "headset", "cap", "glasses", "crown", "bow"];
+
+module.exports = { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS };

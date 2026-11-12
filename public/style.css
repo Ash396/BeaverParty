@@ -114,7 +114,8 @@ button.secondary { background: var(--surface-2); color: var(--text); border-colo
 .lobby-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .lobby-card h3 { margin: 0 0 0.25rem; }
 .lobby-card p { margin: 0.15rem 0; }
-.roster { padding-left: 1.25rem; }
+.roster { list-style: none; padding-left: 0; }
+.roster li { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; }
 .chat-log { border: 1px solid var(--border); border-radius: 8px; height: 280px; overflow-y: auto; padding: 0.5rem 0.75rem; background: var(--surface); }
 .chat-log p { margin: 0.3rem 0; overflow-wrap: anywhere; }
 .chat-log .who { font-weight: bold; margin-right: 0.4rem; color: var(--p0); }
@@ -134,3 +135,23 @@ body.landing { min-height: 100vh; display: flex; align-items: center; justify-co
 .landing h1 { font-size: 2.5rem; margin: 0 0 0.5rem; }
 .landing h1 .dots i { width: 12px; height: 12px; }
 .landing .corner { position: fixed; top: 0.5rem; right: 0.5rem; z-index: 2; }
+
+/* Avatars */
+.avatar { display: block; image-rendering: pixelated; flex-shrink: 0; }
+.avatar-picker { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
+.avatar-picker p { margin: 0.5rem 0 0.25rem; }
+.avatar-preview { background: var(--surface-2); border-radius: 12px; padding: 8px; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+button.choice { background: var(--surface-2); border: 2px solid var(--border); padding: 3px; border-radius: 8px; line-height: 0; }
+button.choice[aria-pressed="true"] { border-color: var(--primary); }
+.user-head { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
+.user-head h1 { margin: 0; }
+.seats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
+.seat { width: 46px; height: 46px; border-radius: 50%; border: 2px dashed var(--border); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.seat.filled { border: 2px solid var(--primary); background: var(--surface-2); }
+
+/* Delete account */
+.danger-zone { margin-top: 3rem; border: 1px solid var(--danger); border-radius: 8px; padding: 0.5rem 1rem; }
+.danger-zone h2 { color: var(--danger); margin: 0.5rem 0; }
+button.danger { background: var(--danger); border-color: var(--danger); color: var(--on-primary); }
+:root[data-theme="light"] button.danger { color: #fff; }

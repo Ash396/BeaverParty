@@ -52,7 +52,7 @@ function decide(config, person) {
   const maxAgeSeconds = Math.round(config.sessionDays * 24 * 3600);
   const session = sign(config.sessionSecret, { anonId, exp: Date.now() + maxAgeSeconds * 1000 });
   return {
-    location: "/",
+    location: "/app.html",
     cookies: [cookie(SESSION_COOKIE, session, { maxAgeSeconds, secure: config.secureCookies })],
     result: "signed in",
     anonId,
@@ -92,7 +92,12 @@ async function handle(config, req, res, url) {
 
   if (url.pathname === "/api/me") {
     const anonId = currentAnonId(config, req);
-    json(res, 200, { authEnabled: config.authEnabled, signedIn: Boolean(anonId) });
+    const account = anonId && accounts.find(anonId);
+    json(res, 200, {
+      authEnabled: config.authEnabled,
+      signedIn: Boolean(anonId),
+      isModerator: Boolean(account && account.isModerator),
+    });
     return true;
   }
 

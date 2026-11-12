@@ -4,10 +4,11 @@
   "private": true,
   "description": "Campus gaming app for MIT students (6.1850 team project)",
   "engines": {
-    "node": ">=18"
+    "node": ">=22.13"
   },
   "scripts": {
-    "start": "node server/index.js",
-    "test": "node --test"
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test",
+    "set-moderator": "node --disable-warning=ExperimentalWarning scripts/set-moderator.js"
   }
 }

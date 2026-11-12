@@ -8,6 +8,7 @@ const { loadConfig } = require("../server/config");
 const { createServer } = require("../server/index");
 const accounts = require("../server/accounts");
 const { anonIdFor } = require("../server/auth");
+const db = require("../server/db");
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: "jwk" }), kid: "k1", use: "sig", alg: "RS256" };
@@ -67,6 +68,7 @@ const provider = http.createServer(async (req, res) => {
 let app, base, config;
 
 test.before(async () => {
+  db.open(":memory:");
   issuer = `http://127.0.0.1:${await listen(provider)}`;
   // The app reads its config per request, so we can fill it in once the
   // app's port is known.
@@ -104,11 +106,11 @@ async function signIn(user) {
 
 test("a student signs in and gets a 7-day session", async () => {
   const { location, session } = await signIn({ email: "Tim@MIT.edu", affiliation: "student" });
-  assert.equal(location, "/");
+  assert.equal(location, "/app.html");
   assert.ok(session);
   assert.equal(fake.lastAuthHeader, `Basic ${Buffer.from("client1:secret1").toString("base64")}`);
   const me = await (await fetch(`${base}/api/me`, { headers: { Cookie: session } })).json();
-  assert.deepEqual(me, { authEnabled: true, signedIn: true });
+  assert.deepEqual(me, { authEnabled: true, signedIn: true, isModerator: false });
   // The account is stored under the HMAC of the lowercased email only.
   assert.ok(accounts.find(anonIdFor(config, "tim@mit.edu")));
 });

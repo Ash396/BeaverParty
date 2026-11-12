@@ -1,23 +1,33 @@
 // Accounts keyed only by anonymous ID. No kerb, email, or name is stored.
-// For now this lives in memory and resets when the server restarts; it will
-// move to the database once we pick one.
-const accounts = new Map();
+const db = require("./db");
 
-function findOrCreate(anonId) {
-  let account = accounts.get(anonId);
-  if (!account) {
-    account = { anonId, createdAt: new Date().toISOString(), banned: false };
-    accounts.set(anonId, account);
-  }
-  return account;
+function toAccount(row) {
+  if (!row) return undefined;
+  return {
+    anonId: row.anon_id,
+    createdAt: row.created_at,
+    banned: Boolean(row.banned),
+    isModerator: Boolean(row.is_moderator),
+  };
 }
 
 function find(anonId) {
-  return accounts.get(anonId);
+  return toAccount(db.get().prepare("SELECT * FROM accounts WHERE anon_id = ?").get(anonId));
+}
+
+function findOrCreate(anonId) {
+  db.get().prepare("INSERT INTO accounts (anon_id) VALUES (?) ON CONFLICT DO NOTHING").run(anonId);
+  return find(anonId);
 }
 
 function setBanned(anonId, banned) {
-  findOrCreate(anonId).banned = banned;
+  findOrCreate(anonId);
+  db.get().prepare("UPDATE accounts SET banned = ? WHERE anon_id = ?").run(banned ? 1 : 0, anonId);
 }
 
-module.exports = { findOrCreate, find, setBanned };
+function setModerator(anonId, isModerator) {
+  findOrCreate(anonId);
+  db.get().prepare("UPDATE accounts SET is_moderator = ? WHERE anon_id = ?").run(isModerator ? 1 : 0, anonId);
+}
+
+module.exports = { find, findOrCreate, setBanned, setModerator };

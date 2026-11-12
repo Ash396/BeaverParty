@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { loadConfig } = require("./config");
 const auth = require("./auth");
+const db = require("./db");
 
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const TYPES = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript" };
@@ -44,6 +45,7 @@ function createServer(config) {
 
 if (require.main === module) {
   const config = loadConfig();
+  db.open(config.dbPath);
   if (!config.authEnabled) {
     console.warn(`Sign-in is off. Missing: ${config.missing.join(", ")}. See .env.example.`);
   }

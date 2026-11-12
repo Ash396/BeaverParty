@@ -4,7 +4,10 @@ WORKDIR /app
 COPY package.json ./
 COPY server ./server
 COPY public ./public
-ENV NODE_ENV=production PORT=3000
+COPY scripts ./scripts
+# The SQLite database lives in /data. On Hyades, mount a volume there.
+RUN mkdir /data && chown node:node /data
+ENV NODE_ENV=production PORT=3000 DB_PATH=/data/beaverparty.db
 EXPOSE 3000
 USER node
-CMD ["node", "server/index.js"]
+CMD ["node", "--disable-warning=ExperimentalWarning", "server/index.js"]

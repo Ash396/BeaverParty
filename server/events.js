@@ -2,6 +2,7 @@
 // request open and the server writes events to it. Two kinds of channel:
 //   "lobbies"     -> the open-lobby list changed (everyone signed in)
 //   "lobby:<id>"  -> a lobby's members, state, or chat changed (members only)
+//   "user:<anonId>" -> things for you alone, like a new friend request
 
 const channels = new Map(); // channel -> Set of { res, anonId }
 

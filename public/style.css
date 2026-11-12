@@ -75,7 +75,13 @@ button.theme-toggle { background: none; border: none; color: var(--muted); paddi
 .sidebar nav a { color: var(--text); text-decoration: none; padding: 0.5rem 0.75rem; border-radius: 6px; }
 .sidebar nav a:hover { background: var(--surface-2); }
 .sidebar nav a[aria-current="page"] { background: var(--primary); color: var(--on-primary); font-weight: 600; }
-.sidebar .bottom { margin-top: auto; display: flex; flex-direction: column; }
+.sidebar .bottom { margin-top: auto; display: flex; flex-direction: column; border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.me-link { display: flex; align-items: center; gap: 0.5rem; color: var(--text); text-decoration: none; padding: 0.4rem 0.75rem; border-radius: 6px; font-weight: 600; min-width: 0; }
+.me-link:hover { background: var(--surface-2); }
+.me-link[aria-current="page"] { background: var(--primary); color: var(--on-primary); }
+#me-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.count { display: inline-block; min-width: 1.3em; padding: 0 0.35em; margin-left: 0.25rem; border-radius: 999px; background: var(--tomato); color: var(--shadow); font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 1.3em; }
+.phone-only { display: none; }
 .sidebar form button { background: none; color: var(--muted); border: none; padding: 0.5rem 0.75rem; font-weight: normal; text-align: left; }
 .content { flex: 1; padding: 2rem; max-width: 900px; }
 .content h1 { margin-top: 0; }
@@ -90,6 +96,10 @@ button.theme-toggle { background: none; border: none; color: var(--muted); paddi
   .sidebar .bottom { margin-top: 0; flex-direction: row; }
   .sidebar .bottom button { font-size: 0.85rem; padding: 0.5rem; }
   .status-toggle .status-label { display: none; } /* just the dot on phones */
+  .sidebar .bottom { border-top: none; padding-top: 0; align-items: center; }
+  .me-link { padding: 0.3rem; }
+  #me-name, .desktop-only { display: none; }
+  .phone-only { display: block; margin-top: 2rem; }
   .status-toggle .presence { width: 12px; height: 12px; margin: 0; }
 }
 
@@ -157,6 +167,17 @@ button.choice[aria-pressed="true"] { border-color: var(--primary); }
 .seats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0.5rem 0; }
 .seat { width: 46px; height: 46px; border-radius: 50%; border: 2px dashed var(--border); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
 .seat.filled { border: 2px solid var(--primary); background: var(--surface-2); }
+
+/* Friends */
+.search input { display: block; width: 100%; max-width: 360px; padding: 0.45rem; margin: 0.25rem 0 0.5rem; }
+.people { list-style: none; padding-left: 0; margin: 0.5rem 0 1rem; }
+.people li { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
+.people li:last-child { border-bottom: none; }
+.people .actions { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; }
+.people button, #user-friend button { padding: 0.3rem 0.75rem; }
+#search-results:not(:empty) { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0 0.75rem; }
+#user-friend { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+#user-friend:empty { display: none; }
 
 /* Delete account */
 .danger-zone { margin-top: 3rem; border: 1px solid var(--danger); border-radius: 8px; padding: 0.5rem 1rem; }

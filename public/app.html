@@ -14,14 +14,16 @@
       <div class="brand">BeaverParty <span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span></div>
       <nav>
         <a href="#lobbies">Lobbies</a>
-        <a href="#profile">My profile</a>
+        <a href="#friends">Friends <span id="friend-count" class="count" hidden></span></a>
         <a href="#heatmap">Heat map</a>
         <a href="#moderation" id="nav-moderation" hidden>Moderation</a>
       </nav>
+      <!-- You: your profile, online status, and account things, at the bottom like most chat apps. -->
       <div class="bottom">
+        <a href="#profile" id="me-link" class="me-link"><span id="me-avatar"></span><span id="me-name">My profile</span></a>
         <button type="button" id="status-toggle" class="status-toggle" hidden></button>
-        <button type="button" class="theme-toggle" data-theme-toggle>Light mode</button>
-        <form method="post" action="/auth/logout"><button type="submit">Log out</button></form>
+        <button type="button" class="theme-toggle desktop-only" data-theme-toggle>Light mode</button>
+        <form method="post" action="/auth/logout" class="desktop-only"><button type="submit">Log out</button></form>
       </div>
     </aside>
 
@@ -117,6 +119,12 @@
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
           <p id="preview-link" hidden><a href="#">See what other students see</a></p>
         </form>
+        <!-- On phones the bottom bar has no room for these. -->
+        <section class="phone-only">
+          <h2>App</h2>
+          <p><button type="button" class="secondary" data-theme-toggle>Light mode</button></p>
+          <form method="post" action="/auth/logout"><button type="submit" class="secondary">Log out</button></form>
+        </section>
         <section id="delete-section" class="danger-zone" hidden>
           <h2>Delete account</h2>
           <p class="small">This removes your profile, games, avatar, chat messages, endorsements, and any lobbies you hosted. It can't be undone. You can sign in again later and start fresh.</p>
@@ -131,8 +139,31 @@
       <div data-page="user" hidden>
         <p><a href="#profile" id="back-link">&larr; Back</a></p>
         <div class="user-head"><span id="user-avatar"></span><div><h1 id="user-name"></h1><p id="user-status" class="muted small" aria-live="polite"></p></div></div>
+        <p id="user-friend"></p>
         <dl id="user-details" class="details"></dl>
         <p id="user-missing" hidden>No student with that username.</p>
+      </div>
+      <div data-page="friends" hidden>
+        <h1>Friends</h1>
+        <form id="friend-search" class="search" role="search">
+          <label for="friend-q" class="small muted">Find someone by username (at least 3 letters)</label>
+          <input id="friend-q" name="q" maxlength="20" autocomplete="off" placeholder="Username">
+        </form>
+        <ul id="search-results" class="people"></ul>
+        <p id="search-empty" class="muted small" hidden>No usernames start with that.</p>
+        <p id="friend-error" class="error" hidden></p>
+        <section id="incoming-box" hidden>
+          <h2>Requests</h2>
+          <ul id="incoming-list" class="people"></ul>
+        </section>
+        <h2>Your friends</h2>
+        <ul id="friend-list" class="people"></ul>
+        <p id="friend-empty" class="muted" hidden>No friends yet. Search for a username above, or add people from their profile.</p>
+        <section id="outgoing-box" hidden>
+          <h2>Sent</h2>
+          <ul id="outgoing-list" class="people"></ul>
+        </section>
+        <p class="muted small">Friending is mutual: they have to accept. Going invisible hides you from everyone, friends included.</p>
       </div>
       <div data-page="heatmap" hidden>
         <h1>Heat map</h1>

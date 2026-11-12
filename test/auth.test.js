@@ -110,7 +110,7 @@ test("a student signs in and gets a 7-day session", async () => {
   assert.ok(session);
   assert.equal(fake.lastAuthHeader, `Basic ${Buffer.from("client1:secret1").toString("base64")}`);
   const me = await (await fetch(`${base}/api/me`, { headers: { Cookie: session } })).json();
-  assert.deepEqual(me, { authEnabled: true, signedIn: true, isModerator: false, username: null, invisible: false });
+  assert.deepEqual(me, { authEnabled: true, signedIn: true, isModerator: false, username: null, invisible: false, avatar: null, friendRequests: 0 });
   // The account is stored under the HMAC of the lowercased email only.
   assert.ok(accounts.find(await anonIdFor(config, "tim@mit.edu")));
 });

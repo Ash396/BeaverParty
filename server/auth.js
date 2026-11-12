@@ -8,6 +8,7 @@ const crypto = require("node:crypto");
 const oidc = require("./oidc");
 const accounts = require("./accounts");
 const profiles = require("./profiles");
+const friends = require("./friends");
 const { sign, unsign, parseCookies, cookie } = require("./session");
 const { computeAnonId } = require("./keyservice");
 
@@ -116,6 +117,8 @@ async function handle(config, req, res, url) {
       isModerator: Boolean(account && account.isModerator),
       username: profile ? profile.username : null,
       invisible: Boolean(profile && profile.invisible),
+      avatar: profile ? profile.avatar : null,
+      friendRequests: profile ? friends.incomingCount(anonId) : 0,
     });
     return true;
   }

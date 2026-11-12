@@ -12,6 +12,10 @@
 //                                            this open is what makes you show as online
 //   GET  /api/endorsements                -> recently closed lobbies you can endorse from
 //   PUT  /api/lobbies/:id/endorsements    -> {username, badges} set what you give someone
+//   GET  /api/friends                     -> your friends (with online status) and requests
+//   GET  /api/friends/search?q=           -> up to 8 usernames starting with q (3+ characters)
+//   POST /api/friends                     -> {username} send a request (or accept theirs)
+//   POST /api/friends/accept | remove     -> {username} accept; or decline, cancel, unfriend
 //   PUT  /api/status                     -> {invisible} appear offline to everyone, or not
 //   POST /api/account/delete              -> {confirm: username} delete your account
 const { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
@@ -29,6 +33,7 @@ presence.setListener((anonId, online) => {
   if (row) events.publish("lobbies", "presence", { username: row.username, online });
 });
 const endorsements = require("./endorsements");
+const friends = require("./friends");
 const { currentAnonId } = require("./auth");
 
 const MAX_BODY = 16 * 1024;
@@ -85,7 +90,10 @@ async function handle(config, req, res, url) {
       json(res, 200, { profile: profiles.save(anonId, body) });
     } else if (req.method === "GET" && p.startsWith("/api/profiles/")) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
-      if (profile) json(res, 200, { profile: { ...profile, badges: endorsements.counts(profile.username) } });
+      if (profile) {
+        const rel = friends.relation(anonId, friends.anonIdOf(profile.username));
+        json(res, 200, { profile: { ...profile, badges: endorsements.counts(profile.username), friend: rel } });
+      }
       else json(res, 404, { error: "No such user." });
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
@@ -111,6 +119,17 @@ async function handle(config, req, res, url) {
       events.publish("lobbies", "changed");
       events.publish(`lobby:${id}`, "changed");
       json(res, 200, { lobby: lobbies.detail(anonId, id) });
+    } else if (req.method === "GET" && p === "/api/friends") {
+      json(res, 200, friends.list(anonId));
+    } else if (req.method === "GET" && p === "/api/friends/search") {
+      json(res, 200, { results: friends.search(anonId, url.searchParams.get("q")) });
+    } else if (req.method === "POST" && /^\/api\/friends(\/accept|\/remove)?$/.test(p)) {
+      const action = p.endsWith("/accept") ? "accept" : p.endsWith("/remove") ? "remove" : "request";
+      const { otherId, relation } = friends[action](anonId, body.username);
+      // Both lists change; the other student's page refreshes live.
+      events.publish(`user:${otherId}`, "friends");
+      events.publish(`user:${anonId}`, "friends");
+      json(res, 200, { relation });
     } else if (req.method === "PUT" && p === "/api/status") {
       if (!profiles.getOwn(anonId)) throw new profiles.ValidationError("Create your profile first.");
       if (typeof body.invisible !== "boolean") throw new profiles.ValidationError("invisible must be true or false.");
@@ -141,7 +160,7 @@ async function handle(config, req, res, url) {
       const badges = endorsements.set(anonId, Number(endorseMatch[1]), body.username, body.badges);
       json(res, 200, { badges });
     } else if (req.method === "GET" && p === "/api/events") {
-      const channels = ["lobbies"];
+      const channels = ["lobbies", `user:${anonId}`];
       const lobbyId = Number(url.searchParams.get("lobby"));
       if (lobbyId && !lobbies.isMember(anonId, lobbyId)) {
         json(res, 403, { error: "Not a member." });

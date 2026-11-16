@@ -64,6 +64,8 @@ test("deleting removes everything, closes your lobby, and signs you out", async 
   const lobbyId = (await call("ann", "GET", "/api/lobbies")).body.myLobbyId;
   await call("ann", "POST", `/api/lobbies/${lobbyId}/messages`, { body: "hi" });
   await call("bob", "POST", `/api/lobbies/${lobbyId}/messages`, { body: "hey" });
+  const later = new Date(Date.now() + 3600_000).toISOString();
+  assert.equal((await call("ann", "POST", "/api/lobbies", { game: "Minecraft", slots: 4, startsAt: later })).status, 201);
 
   const res = await call("ann", "POST", "/api/account/delete", { confirm: "USER_ANN" });
   assert.equal(res.status, 200);
@@ -74,6 +76,7 @@ test("deleting removes everything, closes your lobby, and signs you out", async 
     assert.equal(conn.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE anon_id = 'ann'`).get().n, 0, table);
   }
   assert.equal(conn.prepare("SELECT COUNT(*) AS n FROM lobbies WHERE host_anon_id = 'ann'").get().n, 0);
+  assert.equal(conn.prepare("SELECT COUNT(*) AS n FROM scheduled_lobbies WHERE host_anon_id = 'ann'").get().n, 0);
   // The old cookie no longer works, and the username is free again.
   assert.equal((await call("ann", "GET", "/api/profile")).status, 401);
   assert.equal((await call("bob", "GET", "/api/profiles/user_ann")).status, 404);

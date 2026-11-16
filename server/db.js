@@ -207,6 +207,23 @@ const MIGRATIONS = [
   CREATE INDEX reports_reported ON reports(reported_anon_id);
   CREATE INDEX reports_reporter ON reports(reporter_anon_id, created_at);
   `,
+  // 10: scheduled lobbies (see lobbies.js). Each becomes a normal lobby at
+  // starts_at (UTC), with the host as its first member.
+  `
+  CREATE TABLE scheduled_lobbies (
+    id             INTEGER PRIMARY KEY,
+    host_anon_id   TEXT NOT NULL UNIQUE REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    game           TEXT NOT NULL,
+    slots          INTEGER NOT NULL,
+    vibe           TEXT,
+    rank           TEXT,
+    voice          INTEGER NOT NULL DEFAULT 0,
+    discord_invite TEXT,
+    starts_at      TEXT NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX scheduled_lobbies_start ON scheduled_lobbies(starts_at);
+  `,
 ];
 
 let db = null;

@@ -249,3 +249,7 @@ dialog.dialog h2 { margin: 0.75rem 0 0.25rem; overflow-wrap: anywhere; }
 
 /* Messages the chat filter blocked, in a moderator's saved copy. */
 .chat-log p.blocked { outline: 1px dashed var(--danger); outline-offset: 2px; border-radius: 4px; }
+
+/* Scheduled lobbies */
+.lobby-card.upcoming { border-style: dashed; }
+.when-label { color: var(--highlight); font-weight: bold; margin: 0.15rem 0; }

@@ -360,6 +360,7 @@ async function loadLobbies() {
   if (myLobbyId) await renderMyLobby();
   else {
     renderList(data.lobbies);
+    renderUpcoming(data.upcoming || []);
     await loadRecent();
   }
   connect();
@@ -395,6 +396,34 @@ function renderList(list) {
     return el("div", { className: "lobby-card" },
       el("div", {}, el("h3", { textContent: lobby.game }), el("p", { className: "muted", textContent: describe(lobby) }), seats(lobby), members),
       join);
+  }));
+}
+
+function startLabel(sqlTime) {
+  return new Date(sqlTime.replace(" ", "T") + "Z").toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+function renderUpcoming(list) {
+  document.getElementById("upcoming-section").hidden = list.length === 0;
+  document.getElementById("upcoming-list").replaceChildren(...list.map((u) => {
+    const bits = [`${u.slots} players`, u.vibe, u.voice ? "voice on" : "no voice"];
+    if (u.rank) bits.push(`rank: ${u.rank}`);
+    const host = el("p", { className: "small" }, beaverSvg(u.avatar, 20), " Host: ", userLink(u.host));
+    const side = [];
+    if (u.isMine) {
+      const cancel = el("button", { type: "button", className: "secondary", textContent: "Cancel" });
+      cancel.addEventListener("click", async () => {
+        if (!confirm("Cancel your scheduled lobby?")) return;
+        try { await api("DELETE", `/api/scheduled/${u.id}`); showError("upcoming-error", null); loadLobbies(); }
+        catch (err) { showError("upcoming-error", err); }
+      });
+      side.push(cancel);
+    }
+    return el("div", { className: "lobby-card upcoming" },
+      el("div", {}, el("h3", { textContent: u.game }),
+        el("p", { className: "when-label", textContent: `Opens ${startLabel(u.startsAt)}` }),
+        el("p", { className: "muted", textContent: bits.join(" · ") }), host),
+      ...side);
   }));
 }
 
@@ -476,15 +505,28 @@ document.querySelector("#create-form select[name=game]").addEventListener("chang
   document.getElementById("other-game").hidden = e.target.value !== "Other";
 });
 
+document.querySelector("#create-form select[name=when]").addEventListener("change", (e) => {
+  const later = e.target.value === "later";
+  document.getElementById("starts-at").hidden = !later;
+  document.getElementById("create-submit").textContent = later ? "Schedule" : "Create";
+});
+
 document.getElementById("create-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const f = event.target.elements;
   try {
+    let startsAt = null;
+    if (f.when.value === "later") {
+      if (!f.startsAt.value) throw new Error("Pick a start time.");
+      startsAt = new Date(f.startsAt.value).toISOString(); // the browser's local time -> UTC
+    }
     await api("POST", "/api/lobbies", {
       game: f.game.value, otherGame: f.otherGame.value, slots: Number(f.slots.value), vibe: f.vibe.value,
-      rank: f.rank.value, voice: f.voice.checked, discordInvite: f.discordInvite.value,
+      rank: f.rank.value, voice: f.voice.checked, discordInvite: f.discordInvite.value, startsAt,
     });
     event.target.reset();
+    document.getElementById("starts-at").hidden = true;
+    document.getElementById("create-submit").textContent = "Create";
     document.getElementById("create-box").open = false;
     showError("create-error", null);
     loadLobbies();

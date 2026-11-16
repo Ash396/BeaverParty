@@ -68,10 +68,12 @@
               <label>Vibe <select name="vibe"><option value="casual">Casual</option><option value="competitive">Competitive</option></select></label>
               <label>Rank <span class="muted">(optional, e.g. "Gold+")</span> <input name="rank" maxlength="30"></label>
               <label class="inline"><input name="voice" type="checkbox"> Voice chat on</label>
+              <label>When <select name="when"><option value="now">Open now</option><option value="later">Schedule for later</option></select></label>
+              <label id="starts-at" hidden>Start time <span class="muted">(up to 7 days ahead)</span> <input name="startsAt" type="datetime-local"></label>
               <label>Discord invite <span class="muted">(optional, shown to members once the lobby fills)</span>
                 <input name="discordInvite" placeholder="https://discord.gg/..." maxlength="100"></label>
               <p id="create-error" class="error" hidden></p>
-              <p><button type="submit">Create</button></p>
+              <p><button type="submit" id="create-submit">Create</button></p>
             </form>
           </details>
           <form id="filter-form" class="filters">
@@ -83,6 +85,12 @@
           </form>
           <div id="lobby-list" class="lobby-list"></div>
           <p id="lobby-empty" class="muted" hidden>No open lobbies right now. Create one!</p>
+          <section id="upcoming-section" hidden>
+            <h2>Upcoming lobbies</h2>
+            <p class="muted small">Scheduled by their hosts. Each one opens at the time shown, and you can join it then.</p>
+            <div id="upcoming-list" class="lobby-list"></div>
+            <p id="upcoming-error" class="error" hidden></p>
+          </section>
           <p id="join-error" class="error" hidden></p>
           <section id="recent-games" hidden>
             <h2>Endorse your recent teammates</h2>

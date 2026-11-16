@@ -4,7 +4,8 @@
 //   PUT /api/profile            -> create or update your profile
 //   GET /api/profiles/:username -> another student's public profile
 //   GET  /api/lobbies?game=&vibe=&voice=&rank=&open=  -> open lobbies (+ your current lobby id)
-//   POST /api/lobbies                     -> create a lobby
+//   POST /api/lobbies                     -> create a lobby (with startsAt: schedule it)
+//   DELETE /api/scheduled/:id             -> cancel your scheduled lobby
 //   GET  /api/lobbies/:id                 -> lobby details (more for members)
 //   POST /api/lobbies/:id/join | leave | close
 //   POST /api/lobbies/:id/messages        -> send a chat message
@@ -94,6 +95,7 @@ async function handle(config, req, res, url) {
     const endorseMatch = p.match(/^\/api\/lobbies\/(\d+)\/endorsements$/);
     const blockMatch = p.match(/^\/api\/blocks\/([^/]+)$/);
     const reportMatch = p.match(/^\/api\/moderation\/reports\/(\d+)$/);
+    const scheduledMatch = p.match(/^\/api\/scheduled\/(\d+)$/);
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
@@ -128,16 +130,22 @@ async function handle(config, req, res, url) {
       else json(res, 404, { error: "No such user." });
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
+      if (lobbies.startDue()) events.publish("lobbies", "changed");
       json(res, 200, {
+        upcoming: lobbies.upcoming(anonId),
         lobbies: lobbies.list({
           game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice"), rank: q.get("rank"), open: q.get("open"),
         }, anonId),
         myLobbyId: lobbies.activeLobbyId(anonId),
       });
     } else if (req.method === "POST" && p === "/api/lobbies") {
-      const id = lobbies.create(anonId, body);
+      const created = lobbies.create(anonId, body);
       events.publish("lobbies", "changed");
-      json(res, 201, { id });
+      json(res, 201, created);
+    } else if (req.method === "DELETE" && scheduledMatch) {
+      lobbies.cancelScheduled(anonId, Number(scheduledMatch[1]));
+      events.publish("lobbies", "changed");
+      json(res, 200, { cancelled: true });
     } else if (req.method === "GET" && lobbyMatch && !lobbyMatch[2]) {
       json(res, 200, { lobby: lobbies.detail(anonId, Number(lobbyMatch[1])) });
     } else if (req.method === "POST" && lobbyMatch && lobbyMatch[2] === "messages") {

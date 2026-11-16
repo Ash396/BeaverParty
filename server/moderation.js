@@ -204,6 +204,7 @@ function resolve(modId, reportId, action) {
     // Leave their lobby the normal way first (closes it if they host).
     const active = lobbies.activeLobbyId(r.reported_anon_id);
     if (active) lobbies.leave(r.reported_anon_id, active);
+    lobbies.dropScheduledFor(r.reported_anon_id);
   }
   conn.exec("BEGIN");
   try {

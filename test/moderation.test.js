@@ -219,7 +219,9 @@ test("a ban signs them out, hides their profile, resolves their reports, and can
   const reports = (await call("mod", "GET", "/api/moderation")).body.reports.filter((x) => x.username === "user_bob2");
   assert.equal(reports.length, 2);
   assert.equal(reports[0].flags.openReportsAboutThem, 2);
+  await call("bob", "POST", "/api/lobbies", { game: "Minecraft", slots: 4, startsAt: new Date(Date.now() + 3600_000).toISOString() });
   assert.equal((await call("mod", "POST", `/api/moderation/reports/${reports[0].id}`, { action: "ban" })).status, 200);
+  assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM scheduled_lobbies WHERE host_anon_id = 'bob'").get().n, 0);
 
   assert.equal(accounts.find("bob").banned, true);
   assert.equal((await call("bob", "GET", "/api/profile")).status, 401);

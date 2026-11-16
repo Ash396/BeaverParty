@@ -105,7 +105,8 @@ server/     The Node.js server
   profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors
   catalog.js  fixed game, dorm, and major lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
-  lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
+  lobbies.js  lobbies (open/full/closed, or scheduled up to 7 days ahead), list filters, members, chat, old-chat cleanup
+  chatfilter.js  chat text filter (word list in chatfilter-words.txt)
   events.js   live updates to browsers over Server-Sent Events
   friends.js  mutual friend requests, friends list, username search (3+ letters, prefix only)
   presence.js online/invisible status: online while the app is open, kept in memory only

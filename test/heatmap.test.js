@@ -38,7 +38,7 @@ function fresh() {
 // Everyone in IDS (opted in) joins one Valorant lobby; "nope" hosts Minecraft without opting in.
 function fillLobbies() {
   for (const id of IDS) heatmap.setOptIn(id, true);
-  const v = lobbies.create("p1", { game: "Valorant", slots: 6 });
+  const v = lobbies.create("p1", { game: "Valorant", slots: 6 }).id;
   for (const id of IDS.slice(1)) lobbies.join(id, v);
   lobbies.create("nope", { game: "Minecraft", slots: 4 });
 }
@@ -75,7 +75,7 @@ test("hours with fewer than k players are thrown away", () => {
   fresh();
   heatmap.setOptIn("p1", true);
   heatmap.setOptIn("p2", true);
-  const v = lobbies.create("p1", { game: "Valorant", slots: 4 });
+  const v = lobbies.create("p1", { game: "Valorant", slots: 4 }).id;
   lobbies.join("p2", v);
   heatmap.sample(TUE_9PM);
   heatmap.sample(TUE_9PM + HOUR);

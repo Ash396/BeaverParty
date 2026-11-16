@@ -1,4 +1,7 @@
-// Lobbies and lobby chat. A lobby is open until it has as many members as
+// Lobbies and lobby chat. A host can open a lobby now or schedule it for
+// later (up to a week ahead, one at a time); a scheduled lobby is listed as
+// upcoming and opens at its time if the host isn't in another lobby then.
+// A lobby is open until it has as many members as
 // slots (full), and closed when the host closes or leaves it. Members see
 // each other's in-game names for the lobby's game; the Discord invite is
 // shown to members once the lobby fills. Each student can be in one open
@@ -64,9 +67,33 @@ function isMember(anonId, id) {
     .get(id, anonId));
 }
 
+const MIN_LEAD_MINUTES = 5;
+const MAX_LEAD_DAYS = 7;
+// If the host is still in another lobby at start time, we keep trying for
+// this long, then drop the scheduled lobby.
+const GRACE_MINUTES = 30;
+
+const sqlTime = (date) => date.toISOString().slice(0, 19).replace("T", " ");
+
+// Returns the start time as SQL UTC text, or null to open now.
+function parseStart(value, now = new Date()) {
+  if (value === undefined || value === null || value === "") return null;
+  const start = new Date(value);
+  if (typeof value !== "string" || Number.isNaN(start.getTime())) throw new ValidationError("Pick a start time.");
+  if (start - now < MIN_LEAD_MINUTES * 60_000) {
+    throw new ValidationError(`Pick a time at least ${MIN_LEAD_MINUTES} minutes from now, or open the lobby now.`);
+  }
+  if (start - now > MAX_LEAD_DAYS * 86_400_000) throw new ValidationError(`You can schedule up to ${MAX_LEAD_DAYS} days ahead.`);
+  return sqlTime(start);
+}
+
+// Creates a lobby now (returns { id }) or schedules one (returns { scheduledId }).
 function create(anonId, input) {
-  requireReady(anonId);
   if (!input || typeof input !== "object") throw new ValidationError("Expected a lobby.");
+  const startsAt = parseStart(input.startsAt);
+  if (startsAt) {
+    if (!usernameOf(anonId)) throw new ValidationError("Create your profile first.");
+  } else requireReady(anonId);
   let game = text(input.game, 60, "Game");
   if (game === "Other") game = text(input.otherGame, 40, "Game name");
   else if (!GAMES.includes(game)) throw new ValidationError("Pick a game.");
@@ -81,13 +108,28 @@ function create(anonId, input) {
   if (discord && !DISCORD_RE.test(discord)) {
     throw new ValidationError("Discord invite must look like https://discord.gg/abc123.");
   }
+  const fields = { game, slots, vibe, rank: text(input.rank, 30, "Rank"), voice: input.voice ? 1 : 0, discord };
+  if (startsAt) {
+    if (db.get().prepare("SELECT 1 FROM scheduled_lobbies WHERE host_anon_id = ?").get(anonId)) {
+      throw new ValidationError("You already have a lobby scheduled. Cancel it first.");
+    }
+    const { lastInsertRowid } = db.get().prepare(`
+      INSERT INTO scheduled_lobbies (host_anon_id, game, slots, vibe, rank, voice, discord_invite, starts_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(anonId, game, slots, vibe, fields.rank, fields.voice, discord, startsAt);
+    return { scheduledId: Number(lastInsertRowid) };
+  }
+  return { id: insertLobby(anonId, fields) };
+}
+
+function insertLobby(anonId, { game, slots, vibe, rank, voice, discord }) {
   const conn = db.get();
   conn.exec("BEGIN");
   try {
     const { lastInsertRowid: id } = conn.prepare(`
       INSERT INTO lobbies (host_anon_id, game, slots, vibe, rank, voice, discord_invite)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(anonId, game, slots, vibe, text(input.rank, 30, "Rank"), input.voice ? 1 : 0, discord);
+    `).run(anonId, game, slots, vibe, rank, voice, discord);
     conn.prepare("INSERT INTO lobby_members (lobby_id, anon_id) VALUES (?, ?)").run(id, anonId);
     conn.exec("COMMIT");
     return Number(id);
@@ -95,6 +137,58 @@ function create(anonId, input) {
     conn.exec("ROLLBACK");
     throw err;
   }
+}
+
+// Upcoming scheduled lobbies, soonest first. Like open lobbies, ones hosted
+// by someone the viewer has a block with are left out, and so are banned hosts.
+function upcoming(viewer = null) {
+  const hide = viewer ? blocks.related(viewer) : new Set();
+  return db.get().prepare(`
+    SELECT s.* FROM scheduled_lobbies s JOIN accounts a ON a.anon_id = s.host_anon_id
+    WHERE a.banned = 0 ORDER BY s.starts_at, s.id LIMIT 50
+  `).all()
+    .filter((s) => !hide.has(s.host_anon_id))
+    .map((s) => ({
+      id: s.id, game: s.game, slots: s.slots, vibe: s.vibe, rank: s.rank, voice: Boolean(s.voice),
+      host: usernameOf(s.host_anon_id), avatar: avatarOf(s.host_anon_id), startsAt: s.starts_at,
+      isMine: s.host_anon_id === viewer,
+    }));
+}
+
+function cancelScheduled(anonId, id) {
+  const row = db.get().prepare("SELECT host_anon_id FROM scheduled_lobbies WHERE id = ?").get(id);
+  if (!row) throw new NotFoundError("No such scheduled lobby.");
+  if (row.host_anon_id !== anonId) throw new ForbiddenError("Only the host can cancel it.");
+  db.get().prepare("DELETE FROM scheduled_lobbies WHERE id = ?").run(id);
+}
+
+function dropScheduledFor(anonId) {
+  db.get().prepare("DELETE FROM scheduled_lobbies WHERE host_anon_id = ?").run(anonId);
+}
+
+// Opens scheduled lobbies whose time has come. Runs every 30 seconds (and
+// before listing lobbies). Returns how many lobbies changed, so the caller
+// knows whether to tell clients.
+function startDue(now = new Date()) {
+  const conn = db.get();
+  const due = conn.prepare("SELECT * FROM scheduled_lobbies WHERE starts_at <= ? ORDER BY starts_at").all(sqlTime(now));
+  let changed = 0;
+  for (const s of due) {
+    const banned = conn.prepare("SELECT banned FROM accounts WHERE anon_id = ?").get(s.host_anon_id);
+    const late = now - new Date(s.starts_at.replace(" ", "T") + "Z") > GRACE_MINUTES * 60_000;
+    if (!banned || banned.banned || !usernameOf(s.host_anon_id) || late) {
+      conn.prepare("DELETE FROM scheduled_lobbies WHERE id = ?").run(s.id);
+      changed++;
+      continue;
+    }
+    if (activeLobbyId(s.host_anon_id)) continue; // host is busy; try again next time
+    insertLobby(s.host_anon_id, {
+      game: s.game, slots: s.slots, vibe: s.vibe, rank: s.rank, voice: s.voice, discord: s.discord_invite,
+    });
+    conn.prepare("DELETE FROM scheduled_lobbies WHERE id = ?").run(s.id);
+    changed++;
+  }
+  return changed;
 }
 
 function summary(lobby) {
@@ -266,6 +360,6 @@ function deleteOldChats(days) {
 }
 
 module.exports = {
-  create, list, detail, join, leave, close, postMessage, deleteOldChats,
+  create, list, upcoming, cancelScheduled, dropScheduledFor, startDue, detail, join, leave, close, postMessage, deleteOldChats,
   activeLobbyId, isMember, usernameOf, NotFoundError, ForbiddenError, VIBES,
 };

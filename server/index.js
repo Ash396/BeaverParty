@@ -63,6 +63,14 @@ if (require.main === module && process.env.ROLE === "keys") {
   heatmap.options.k = config.heatmapK;
   heatmap.sample();
   setInterval(() => heatmap.sample(), 60_000).unref();
+  // Open scheduled lobbies when their time comes.
+  const lobbies = require("./lobbies");
+  const events = require("./events");
+  setInterval(() => {
+    try {
+      if (lobbies.startDue()) events.publish("lobbies", "changed");
+    } catch (err) { console.error(err); }
+  }, 30_000).unref();
   if (!config.authEnabled) {
     console.warn(`Sign-in is off. Missing: ${config.missing.join(", ")}. See .env.example.`);
   }

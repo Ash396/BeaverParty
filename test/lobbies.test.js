@@ -152,6 +152,59 @@ test("filter by rank (ignoring case) and by open slots", async () => {
   await call("fay", "POST", `/api/lobbies/${plat}/close`);
 });
 
+test("schedule a lobby: listed as upcoming, then opens at its time", async () => {
+  for (const id of ["hal", "ivy"]) student(id);
+  const inAnHour = new Date(Date.now() + 3600_000).toISOString();
+  assert.equal((await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: new Date(Date.now() + 60_000).toISOString() })).status, 400, "too soon");
+  assert.equal((await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: new Date(Date.now() + 8 * 86_400_000).toISOString() })).status, 400, "too far");
+  assert.equal((await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: "soon" })).status, 400);
+  const res = await call("hal", "POST", "/api/lobbies", { ...valorant, rank: "Gold", startsAt: inAnHour });
+  assert.equal(res.status, 201);
+  const scheduledId = res.body.scheduledId;
+  assert.ok(scheduledId);
+  assert.equal((await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: inAnHour })).status, 400, "one at a time");
+
+  // Scheduling doesn't put you in a lobby; you can still play now.
+  const now = await call("hal", "GET", "/api/lobbies");
+  assert.equal(now.body.myLobbyId, null);
+  const seen = (await call("ivy", "GET", "/api/lobbies")).body.upcoming.find((u) => u.id === scheduledId);
+  assert.equal(seen.host, "user_hal");
+  assert.equal(seen.isMine, false);
+  assert.equal(seen.rank, "Gold");
+
+  // Someone with a block doesn't see it.
+  await call("ivy", "PUT", "/api/blocks/user_hal");
+  assert.ok(!(await call("ivy", "GET", "/api/lobbies")).body.upcoming.some((u) => u.id === scheduledId));
+  await call("ivy", "DELETE", "/api/blocks/user_hal");
+
+  // Not due yet: nothing happens. At its time it opens with hal as host.
+  assert.equal(lobbies.startDue(), 0);
+  assert.equal(lobbies.startDue(new Date(Date.now() + 3601_000)), 1);
+  const after = await call("hal", "GET", "/api/lobbies");
+  assert.ok(after.body.myLobbyId);
+  assert.ok(!after.body.upcoming.some((u) => u.id === scheduledId));
+  const lobby = (await call("hal", "GET", `/api/lobbies/${after.body.myLobbyId}`)).body.lobby;
+  assert.equal(lobby.rank, "Gold");
+  assert.equal(lobby.isHost, true);
+  await call("hal", "POST", `/api/lobbies/${after.body.myLobbyId}/close`);
+});
+
+test("a scheduled lobby waits while its host is busy, then gives up; hosts can cancel", async () => {
+  const inAnHour = new Date(Date.now() + 3600_000).toISOString();
+  const scheduledId = (await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: inAnHour })).body.scheduledId;
+  const busy = (await call("hal", "POST", "/api/lobbies", valorant)).body.id;
+  assert.equal(lobbies.startDue(new Date(Date.now() + 3610_000)), 0, "host busy: wait");
+  assert.equal(lobbies.startDue(new Date(Date.now() + 3600_000 + 31 * 60_000)), 1, "dropped after 30 minutes");
+  assert.equal((await call("hal", "GET", "/api/lobbies")).body.myLobbyId, busy);
+  await call("hal", "POST", `/api/lobbies/${busy}/close`);
+  assert.equal((await call("hal", "DELETE", `/api/scheduled/${scheduledId}`)).status, 404);
+
+  const again = (await call("hal", "POST", "/api/lobbies", { ...valorant, startsAt: inAnHour })).body.scheduledId;
+  assert.equal((await call("ivy", "DELETE", `/api/scheduled/${again}`)).status, 403);
+  assert.equal((await call("hal", "DELETE", `/api/scheduled/${again}`)).status, 200);
+  assert.ok(!(await call("ivy", "GET", "/api/lobbies")).body.upcoming.length);
+});
+
 test("old chat from closed lobbies is deleted", () => {
   db.get().prepare("UPDATE lobbies SET closed_at = datetime('now', '-8 days') WHERE id = ?").run(lobbyId);
   assert.equal(lobbies.deleteOldChats(7), 1);

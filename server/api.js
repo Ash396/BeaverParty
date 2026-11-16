@@ -1,5 +1,5 @@
 // JSON API for signed-in students.
-//   GET /api/catalog            -> games and dorms to choose from
+//   GET /api/catalog            -> games, dorms, and majors to choose from
 //   GET /api/profile            -> your own profile (or null)
 //   PUT /api/profile            -> create or update your profile
 //   GET /api/profiles/:username -> another student's public profile
@@ -28,7 +28,7 @@
 //   GET  /api/moderation                  -> open reports, banned students, recent decisions
 //   POST /api/moderation/reports/:id      -> {action: dismiss | warn | ban}
 //   POST /api/moderation/unban            -> {username}
-const { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
+const { GAMES, DORMS, MAJORS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
 const { deleteAccount } = require("./deletion");
 const { cookie } = require("./session");
 const profiles = require("./profiles");
@@ -98,7 +98,7 @@ async function handle(config, req, res, url) {
 
     if (req.method === "GET" && p === "/api/catalog") {
       json(res, 200, {
-        games: GAMES, dorms: DORMS, vibes: lobbies.VIBES,
+        games: GAMES, dorms: DORMS, majors: MAJORS, vibes: lobbies.VIBES,
         avatarColors: AVATAR_COLORS, avatarItems: AVATAR_ITEMS, reportReasons: moderation.REASONS,
       });
     } else if (req.method === "GET" && p === "/api/profile") {
@@ -111,12 +111,14 @@ async function handle(config, req, res, url) {
         // Someone you have a block with (either way) always looks offline.
         const otherId = profiles.anonIdOf(profile.username);
         const blocked = blocks.between(anonId, otherId);
-        // A block (either way) also hides the opt-in real name and dorm, so
-        // someone you blocked, or who blocked you, can't learn where you live.
+        // A block (either way) also hides the opt-in real name, dorm, and
+        // major, so someone you blocked, or who blocked you, can't use them to
+        // find you.
         json(res, 200, { profile: {
           ...profile,
           realName: blocked ? null : profile.realName,
           dorm: blocked ? null : profile.dorm,
+          major: blocked ? null : profile.major,
           online: profile.online && !blocked,
           badges: endorsements.counts(profile.username),
           blockedByMe: blocks.list(anonId).includes(profile.username),

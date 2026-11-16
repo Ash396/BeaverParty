@@ -167,6 +167,10 @@ const MIGRATIONS = [
     value INTEGER NOT NULL
   );
   `,
+  // 8: opt-in major (from catalog.MAJORS). Null means not shown.
+  `
+  ALTER TABLE profiles ADD COLUMN major TEXT;
+  `,
 ];
 
 let db = null;

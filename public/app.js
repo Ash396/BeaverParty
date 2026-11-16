@@ -56,6 +56,8 @@ async function loadProfile() {
 
   const dorm = form.elements.dorm;
   if (dorm.options.length === 1) for (const d of catalog.dorms) dorm.append(el("option", { value: d, textContent: d }));
+  const major = form.elements.major;
+  if (major.options.length === 1) for (const m of catalog.majors) major.append(el("option", { value: m, textContent: m }));
 
   const mine = new Map((profile ? profile.games : []).map((g) => [g.game, g]));
   const list = document.getElementById("game-list");
@@ -81,6 +83,7 @@ async function loadProfile() {
   form.elements.username.value = profile ? profile.username : "";
   form.elements.realName.value = (profile && profile.realName) || "";
   dorm.value = (profile && profile.dorm) || "";
+  major.value = (profile && profile.major) || "";
   const preview = document.getElementById("preview-link");
   preview.hidden = !profile;
   if (profile) preview.querySelector("a").href = `#user/${encodeURIComponent(profile.username)}`;
@@ -101,6 +104,7 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
       username: form.elements.username.value,
       realName: form.elements.realName.value,
       dorm: form.elements.dorm.value,
+      major: form.elements.major.value,
       avatar: avatarChoice,
       games,
     });
@@ -619,6 +623,7 @@ async function loadUser(username) {
     rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);
     if (profile.realName) rows.push(["Real name", profile.realName]);
     if (profile.dorm) rows.push(["Dorm", profile.dorm]);
+    if (profile.major) rows.push(["Major", profile.major]);
     for (const [k, v] of rows) details.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
   } catch {
     missing.hidden = false;

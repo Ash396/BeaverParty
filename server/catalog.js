@@ -45,4 +45,33 @@ const DORMS = [
 const AVATAR_COLORS = ["brown", "tomato", "gold", "mint", "sapphire", "grey"];
 const AVATAR_ITEMS = ["none", "headset", "cap", "glasses", "crown", "bow"];
 
-module.exports = { GAMES, DORMS, AVATAR_COLORS, AVATAR_ITEMS };
+// Majors by department ("Course"), not sub-major: 6-3 vs 6-4 or a small
+// joint major would shrink the group of students who share it. Grad
+// students pick their department too.
+const MAJORS = [
+  "Course 1 (Civil and Environmental Eng.)",
+  "Course 2 (Mechanical Eng.)",
+  "Course 3 (Materials Science and Eng.)",
+  "Course 4 (Architecture)",
+  "Course 5 (Chemistry)",
+  "Course 6 (EECS)",
+  "Course 7 (Biology)",
+  "Course 8 (Physics)",
+  "Course 9 (Brain and Cognitive Sciences)",
+  "Course 10 (Chemical Eng.)",
+  "Course 11 (Urban Studies and Planning)",
+  "Course 12 (EAPS)",
+  "Course 14 (Economics)",
+  "Course 15 (Management)",
+  "Course 16 (Aero/Astro)",
+  "Course 17 (Political Science)",
+  "Course 18 (Mathematics)",
+  "Course 20 (Biological Eng.)",
+  "Course 21 (Humanities)",
+  "Course 22 (Nuclear Science and Eng.)",
+  "Course 24 (Linguistics and Philosophy)",
+  "Other or interdisciplinary",
+  "Undeclared",
+];
+
+module.exports = { GAMES, DORMS, MAJORS, AVATAR_COLORS, AVATAR_ITEMS };

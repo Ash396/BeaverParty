@@ -1,7 +1,7 @@
 // Reports and moderation, following the team's decisions (2026-11-12):
 //   - Moderators are our team, labeled as moderators on their profiles.
 //   - Moderators see the reported username and a saved copy of the lobby
-//     chat. Never real names, dorms, or anyone's anonymous ID.
+//     chat. Never real names, dorms, majors, or anyone's anonymous ID.
 //   - The reporter is hidden from the reported student and from moderators.
 //     We store the reporter's anonymous ID only so the queue can flag
 //     someone who files many reports, or many that get dismissed.

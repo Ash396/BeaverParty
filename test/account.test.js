@@ -82,11 +82,13 @@ test("deleting removes everything, closes your lobby, and signs you out", async 
 });
 
 test("with an open report, only the bare account row stays (so a ban still works)", async () => {
+  profiles.save("cat", { username: "user_cat", majors: ["6-3"], games: [{ game: "Minecraft" }] });
   db.get().prepare("INSERT INTO reports (reporter_anon_id, reported_anon_id, reason) VALUES ('bob', 'cat', 'spam')").run();
   const res = await call("cat", "POST", "/api/account/delete", { confirm: "user_cat" });
   assert.equal(res.status, 200);
   assert.ok(accounts.find("cat"), "row kept");
   assert.equal(profiles.getOwn("cat"), null);
+  assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM profile_majors WHERE anon_id = 'cat'").get().n, 0);
   accounts.setBanned("cat", true);
   assert.equal(accounts.find("cat").banned, true);
 });

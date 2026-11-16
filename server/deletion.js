@@ -1,4 +1,4 @@
-// Deleting your account. Removes your profile, games, avatar, chat messages,
+// Deleting your account. Removes your profile, games, majors, avatar, chat messages,
 // lobby memberships, lobbies you hosted, endorsements you gave or got,
 // blocks in either direction, warnings, and friends and friend requests.
 //
@@ -39,6 +39,7 @@ function deleteAccount(anonId) {
       conn.prepare("DELETE FROM lobbies WHERE host_anon_id = ?").run(anonId);
     }
     conn.prepare("DELETE FROM profile_games WHERE anon_id = ?").run(anonId);
+    conn.prepare("DELETE FROM profile_majors WHERE anon_id = ?").run(anonId);
     conn.prepare("DELETE FROM profiles WHERE anon_id = ?").run(anonId);
     if (!keepRow) conn.prepare("DELETE FROM accounts WHERE anon_id = ?").run(anonId);
     conn.exec("COMMIT");

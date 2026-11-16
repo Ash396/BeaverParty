@@ -9,6 +9,15 @@ const USERNAME_RE = /^[A-Za-z0-9_-]{3,20}$/;
 
 class ValidationError extends Error {}
 
+// Thrown by save() when the opt-in fields being saved could point to one
+// student. The API turns it into a warning the student can accept.
+class RiskWarning extends Error {
+  constructor(warning) {
+    super("Fewer than a few other students share what you're about to show.");
+    this.warning = warning;
+  }
+}
+
 function clean(value, max) {
   if (value === undefined || value === null) return null;
   if (typeof value !== "string") throw new ValidationError("expected text");
@@ -101,12 +110,78 @@ function getPublic(username) {
   };
 }
 
-// Returns the saved profile, or throws ValidationError.
-function save(anonId, input) {
+// ---- Re-identification warning ----
+// Opt-in fields are harmless one at a time but can point to one student
+// together (Simmons + 6-3 + Immortal in Valorant). Before saving, we count
+// the other BeaverParty students who show the same dorm, the same majors,
+// and the same rank in each game you give a rank for. If fewer than k do,
+// the student is warned and has to confirm. Real name is always warned
+// about when it's added or changed. The count itself is never shown (only
+// "fewer than k"), so the warning can't be used to probe who has what.
+
+// What a profile exposes beyond username and games, as a comparable key.
+function exposure(p) {
+  const ranks = p.games.filter((g) => g.rank).map((g) => `${g.game}=${g.rank.toLowerCase()}`).sort();
+  return { dorm: p.dorm || null, majors: [...(p.majors || [])].sort(), ranks };
+}
+
+// Does `next` show anything `prev` didn't? Removing fields never warns.
+function addsExposure(prev, next) {
+  if (!prev) return true;
+  if (next.dorm && next.dorm !== prev.dorm) return true;
+  if (next.majors.some((m) => !prev.majors.includes(m))) return true;
+  return next.ranks.some((r) => !prev.ranks.includes(r));
+}
+
+function othersSharing(anonId, mine) {
+  const conn = db.get();
+  const majorsOf = conn.prepare("SELECT major FROM profile_majors WHERE anon_id = ?");
+  const ranksOf = conn.prepare("SELECT game, rank FROM profile_games WHERE anon_id = ? AND rank IS NOT NULL");
+  let n = 0;
+  for (const row of conn.prepare(`
+    SELECT p.anon_id, p.dorm FROM profiles p JOIN accounts a ON a.anon_id = p.anon_id
+    WHERE p.anon_id <> ? AND a.banned = 0
+  `).all(anonId)) {
+    if (mine.dorm && row.dorm !== mine.dorm) continue;
+    if (mine.majors.length) {
+      const theirs = majorsOf.all(row.anon_id).map((m) => m.major).sort();
+      if (JSON.stringify(theirs) !== JSON.stringify(mine.majors)) continue;
+    }
+    if (mine.ranks.length) {
+      const theirs = new Set(ranksOf.all(row.anon_id).map((g) => `${g.game}=${g.rank.toLowerCase()}`));
+      if (!mine.ranks.every((r) => theirs.has(r))) continue;
+    }
+    n++;
+  }
+  return n;
+}
+
+// Returns null, or { k, realName, fields } describing what to warn about.
+function riskOf(anonId, p, k) {
+  const before = getOwn(anonId);
+  const realName = Boolean(p.realName) && (!before || before.realName !== p.realName);
+  const mine = exposure(p);
+  const fields = [];
+  if (mine.dorm) fields.push("dorm");
+  if (mine.majors.length) fields.push(mine.majors.length > 1 ? "majors" : "major");
+  if (mine.ranks.length) fields.push(mine.ranks.length > 1 ? "ranks" : "rank");
+  const changed = addsExposure(before && exposure(before), mine);
+  const rare = fields.length > 0 && changed && othersSharing(anonId, mine) < k;
+  if (!realName && !rare) return null;
+  return { k, realName, fields: rare ? fields : [] };
+}
+
+// Returns the saved profile, or throws ValidationError. With options.k
+// set (the API does), also throws RiskWarning unless options.acknowledged.
+function save(anonId, input, options = {}) {
   const p = validate(input);
   const conn = db.get();
   const taken = conn.prepare("SELECT anon_id FROM profiles WHERE username = ?").get(p.username);
   if (taken && taken.anon_id !== anonId) throw new ValidationError("That username is taken.");
+  if (options.k && !options.acknowledged) {
+    const warning = riskOf(anonId, p, options.k);
+    if (warning) throw new RiskWarning(warning);
+  }
   conn.exec("BEGIN");
   try {
     conn.prepare(`
@@ -136,4 +211,4 @@ function anonIdOf(username) {
   return row ? row.anon_id : null;
 }
 
-module.exports = { anonIdOf, getOwn, getPublic, save, avatarOf, ValidationError };
+module.exports = { anonIdOf, getOwn, getPublic, save, avatarOf, ValidationError, RiskWarning };

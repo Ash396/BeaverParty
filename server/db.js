@@ -177,6 +177,71 @@ const MIGRATIONS = [
     PRIMARY KEY (anon_id, major)
   );
   `,
+  // 9: the chat filter files reports too (see chatfilter.js), so a report
+  // may have no reporter. source says who filed it. SQLite can't drop NOT
+  // NULL in place, so the table is rebuilt; nothing references it.
+  `
+  CREATE TABLE reports_new (
+    id               INTEGER PRIMARY KEY,
+    source           TEXT NOT NULL DEFAULT 'student' CHECK (source IN ('student', 'filter')),
+    reporter_anon_id TEXT REFERENCES accounts(anon_id),
+    reported_anon_id TEXT NOT NULL REFERENCES accounts(anon_id),
+    lobby_id         INTEGER REFERENCES lobbies(id),
+    reason           TEXT NOT NULL,
+    snapshot         TEXT,
+    status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at      TEXT,
+    details          TEXT,
+    action           TEXT CHECK (action IN ('dismissed', 'warned', 'banned')),
+    resolved_by      TEXT,
+    CHECK ((source = 'student') = (reporter_anon_id IS NOT NULL))
+  );
+  INSERT INTO reports_new (id, reporter_anon_id, reported_anon_id, lobby_id, reason, snapshot, status,
+    created_at, resolved_at, details, action, resolved_by)
+    SELECT id, reporter_anon_id, reported_anon_id, lobby_id, reason, snapshot, status,
+    created_at, resolved_at, details, action, resolved_by FROM reports;
+  DROP TABLE reports;
+  ALTER TABLE reports_new RENAME TO reports;
+  CREATE INDEX reports_status ON reports(status, created_at);
+  CREATE INDEX reports_reported ON reports(reported_anon_id);
+  CREATE INDEX reports_reporter ON reports(reporter_anon_id, created_at);
+  `,
+  // 10: scheduled lobbies (see lobbies.js). Each becomes a normal lobby at
+  // starts_at (UTC), with the host as its first member.
+  `
+  CREATE TABLE scheduled_lobbies (
+    id             INTEGER PRIMARY KEY,
+    host_anon_id   TEXT NOT NULL UNIQUE REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    game           TEXT NOT NULL,
+    slots          INTEGER NOT NULL,
+    vibe           TEXT,
+    rank           TEXT,
+    voice          INTEGER NOT NULL DEFAULT 0,
+    discord_invite TEXT,
+    starts_at      TEXT NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX scheduled_lobbies_start ON scheduled_lobbies(starts_at);
+  `,
+  // 11: reserving a spot in a scheduled lobby. When it opens, reservers who
+  // aren't there yet get a held seat until held_until (see lobbies.js).
+  `
+  CREATE TABLE scheduled_reservations (
+    scheduled_id INTEGER NOT NULL REFERENCES scheduled_lobbies(id) ON DELETE CASCADE,
+    anon_id      TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (scheduled_id, anon_id)
+  );
+  CREATE INDEX scheduled_reservations_anon ON scheduled_reservations(anon_id);
+  CREATE TABLE lobby_holds (
+    lobby_id   INTEGER NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+    anon_id    TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    held_until TEXT NOT NULL,
+    PRIMARY KEY (lobby_id, anon_id)
+  );
+  CREATE INDEX lobby_holds_anon ON lobby_holds(anon_id);
+  `,
 ];
 
 let db = null;

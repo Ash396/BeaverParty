@@ -9,6 +9,8 @@
 //     so renaming or chat expiry can't erase the evidence. The copy is
 //     deleted when the report is resolved; only the reason, outcome, and
 //     who resolved it are kept, so repeat problems can be counted.
+//   - The chat filter (chatfilter.js) files reports too, with no reporter.
+//     Repeat hits by the same student in the same lobby go into one report.
 // In the saved chat, the reported student is shown by username and everyone
 // else as "Player 1", "Player 2", ..., so the copy doesn't point at the
 // reporter or expose bystanders.
@@ -110,6 +112,33 @@ function report(reporterId, input) {
   return Number(lastInsertRowid);
 }
 
+// Called by lobbies.postMessage when the chat filter blocks a message that
+// moderators should see. The blocked message is saved only in the report
+// (marked blocked), after the chat that came before it.
+function flagMessage(senderId, lobbyId, body, reason) {
+  const conn = db.get();
+  const lobby = conn.prepare("SELECT * FROM lobbies WHERE id = ?").get(lobbyId);
+  const sender = conn.prepare("SELECT username FROM profiles WHERE anon_id = ?").get(senderId);
+  if (!lobby || !sender) return;
+  const blocked = { who: sender.username, reported: true, blocked: true, body, createdAt: new Date().toISOString().slice(0, 19).replace("T", " ") };
+  const open = conn.prepare(`
+    SELECT id, snapshot FROM reports WHERE status = 'open' AND source = 'filter' AND reported_anon_id = ? AND lobby_id = ? AND reason = ?
+  `).get(senderId, lobbyId, reason);
+  if (open) {
+    const snap = JSON.parse(open.snapshot);
+    snap.messages.push(blocked);
+    snap.messages = snap.messages.slice(-SNAPSHOT_MESSAGES);
+    conn.prepare("UPDATE reports SET snapshot = ? WHERE id = ?").run(JSON.stringify(snap), open.id);
+    return;
+  }
+  const snap = snapshot(senderId, sender.username, lobby);
+  snap.messages.push(blocked);
+  conn.prepare(`
+    INSERT INTO reports (source, reporter_anon_id, reported_anon_id, lobby_id, reason, snapshot)
+    VALUES ('filter', NULL, ?, ?, ?, ?)
+  `).run(senderId, lobbyId, reason, JSON.stringify(snap));
+}
+
 function requireModerator(anonId) {
   const account = accounts.find(anonId);
   if (!account || !account.isModerator) throw new ForbiddenError("Moderators only.");
@@ -123,7 +152,7 @@ function queue(modId) {
   const rows = conn.prepare(`
     SELECT r.*, p.username AS current_username FROM reports r
     LEFT JOIN profiles p ON p.anon_id = r.reported_anon_id
-    WHERE r.status = 'open' AND r.reported_anon_id <> ? AND r.reporter_anon_id <> ?
+    WHERE r.status = 'open' AND r.reported_anon_id <> ? AND (r.reporter_anon_id IS NULL OR r.reporter_anon_id <> ?)
     ORDER BY r.created_at, r.id LIMIT 100
   `).all(modId, modId);
   const one = (sql, ...args) => Number(conn.prepare(sql).get(...args).n);
@@ -131,6 +160,7 @@ function queue(modId) {
     const snap = JSON.parse(r.snapshot || "{}");
     return {
       id: r.id,
+      source: r.source,
       createdAt: r.created_at,
       reason: r.reason,
       details: r.details,
@@ -166,7 +196,7 @@ function resolve(modId, reportId, action) {
   const r = conn.prepare("SELECT * FROM reports WHERE id = ?").get(Number(reportId));
   if (!r) throw new NotFoundError("No such report.");
   if (r.status !== "open") throw new ValidationError("This report was already resolved.");
-  if (r.reported_anon_id === modId || r.reporter_anon_id === modId) {
+  if (r.reported_anon_id === modId || (r.reporter_anon_id && r.reporter_anon_id === modId)) {
     throw new ForbiddenError("Another moderator needs to handle this one.");
   }
 
@@ -174,6 +204,7 @@ function resolve(modId, reportId, action) {
     // Leave their lobby the normal way first (closes it if they host).
     const active = lobbies.activeLobbyId(r.reported_anon_id);
     if (active) lobbies.leave(r.reported_anon_id, active);
+    lobbies.dropScheduledFor(r.reported_anon_id);
   }
   conn.exec("BEGIN");
   try {
@@ -242,5 +273,5 @@ function ackWarnings(anonId) {
 }
 
 module.exports = {
-  REASONS, report, queue, resolve, bannedList, unban, history, pendingWarning, ackWarnings,
+  REASONS, report, flagMessage, queue, resolve, bannedList, unban, history, pendingWarning, ackWarnings,
 };

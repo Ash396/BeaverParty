@@ -1,10 +1,13 @@
 // JSON API for signed-in students.
 //   GET /api/catalog            -> games, dorms, and majors to choose from
 //   GET /api/profile            -> your own profile (or null)
-//   PUT /api/profile            -> create or update your profile
+//   PUT /api/profile            -> create or update your profile; 409 with a warning if the
+//                                  opt-in fields could identify you (resend with acknowledgeRisk)
 //   GET /api/profiles/:username -> another student's public profile
-//   GET  /api/lobbies?game=&vibe=&voice=  -> open lobbies (+ your current lobby id)
-//   POST /api/lobbies                     -> create a lobby
+//   GET  /api/lobbies?game=&vibe=&voice=&rank=&open=  -> open lobbies (+ your current lobby id)
+//   POST /api/lobbies                     -> create a lobby (with startsAt: schedule it)
+//   DELETE /api/scheduled/:id             -> cancel your scheduled lobby
+//   POST | DELETE /api/scheduled/:id/reserve -> reserve a spot in someone's scheduled lobby, or not
 //   GET  /api/lobbies/:id                 -> lobby details (more for members)
 //   POST /api/lobbies/:id/join | leave | close
 //   POST /api/lobbies/:id/messages        -> send a chat message
@@ -94,6 +97,8 @@ async function handle(config, req, res, url) {
     const endorseMatch = p.match(/^\/api\/lobbies\/(\d+)\/endorsements$/);
     const blockMatch = p.match(/^\/api\/blocks\/([^/]+)$/);
     const reportMatch = p.match(/^\/api\/moderation\/reports\/(\d+)$/);
+    const scheduledMatch = p.match(/^\/api\/scheduled\/(\d+)$/);
+    const reserveMatch = p.match(/^\/api\/scheduled\/(\d+)\/reserve$/);
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
@@ -104,7 +109,7 @@ async function handle(config, req, res, url) {
     } else if (req.method === "GET" && p === "/api/profile") {
       json(res, 200, { profile: profiles.getOwn(anonId) });
     } else if (req.method === "PUT" && p === "/api/profile") {
-      json(res, 200, { profile: profiles.save(anonId, body) });
+      json(res, 200, { profile: profiles.save(anonId, body, { k: config.reidK, acknowledged: Boolean(body && body.acknowledgeRisk === true) }) });
     } else if (req.method === "GET" && p.startsWith("/api/profiles/")) {
       const profile = profiles.getPublic(decodeURIComponent(p.slice("/api/profiles/".length)));
       if (profile) {
@@ -128,14 +133,29 @@ async function handle(config, req, res, url) {
       else json(res, 404, { error: "No such user." });
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
+      if (lobbies.startDue()) events.publish("lobbies", "changed");
       json(res, 200, {
-        lobbies: lobbies.list({ game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice") }, anonId),
+        upcoming: lobbies.upcoming(anonId),
+        holds: lobbies.holdsFor(anonId),
+        lobbies: lobbies.list({
+          game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice"), rank: q.get("rank"), open: q.get("open"),
+        }, anonId),
         myLobbyId: lobbies.activeLobbyId(anonId),
       });
     } else if (req.method === "POST" && p === "/api/lobbies") {
-      const id = lobbies.create(anonId, body);
+      const created = lobbies.create(anonId, body);
       events.publish("lobbies", "changed");
-      json(res, 201, { id });
+      json(res, 201, created);
+    } else if ((req.method === "POST" || req.method === "DELETE") && reserveMatch) {
+      const id = Number(reserveMatch[1]);
+      if (req.method === "POST") lobbies.reserve(anonId, id);
+      else lobbies.unreserve(anonId, id);
+      events.publish("lobbies", "changed");
+      json(res, 200, { reserved: req.method === "POST" });
+    } else if (req.method === "DELETE" && scheduledMatch) {
+      lobbies.cancelScheduled(anonId, Number(scheduledMatch[1]));
+      events.publish("lobbies", "changed");
+      json(res, 200, { cancelled: true });
     } else if (req.method === "GET" && lobbyMatch && !lobbyMatch[2]) {
       json(res, 200, { lobby: lobbies.detail(anonId, Number(lobbyMatch[1])) });
     } else if (req.method === "POST" && lobbyMatch && lobbyMatch[2] === "messages") {
@@ -249,7 +269,8 @@ async function handle(config, req, res, url) {
       json(res, 404, { error: "Not found." });
     }
   } catch (err) {
-    if (err instanceof profiles.ValidationError) json(res, 400, { error: err.message });
+    if (err instanceof profiles.RiskWarning) json(res, 409, { error: err.message, warning: err.warning });
+    else if (err instanceof profiles.ValidationError) json(res, 400, { error: err.message });
     else if (err instanceof lobbies.NotFoundError) json(res, 404, { error: err.message });
     else if (err instanceof lobbies.ForbiddenError) json(res, 403, { error: err.message });
     else throw err;

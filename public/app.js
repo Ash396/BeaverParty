@@ -14,7 +14,7 @@ async function api(method, path, body) {
   });
   if (res.status === 401) location.replace("/");
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong."), { status: res.status, data });
   return data;
 }
 
@@ -133,9 +133,39 @@ function renderMajorPicker(selected) {
 }
 let pickedMajorsOrder = [];
 
-document.getElementById("profile-form").addEventListener("submit", async (event) => {
+// The re-identification warning: the server answers 409 when what you're
+// about to show could point to you. Explain, and let the student go back or
+// save anyway.
+function listWords(words) {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+function showRiskWarning(warning) {
+  const box = document.getElementById("profile-risk");
+  const parts = [];
+  if (warning.realName) parts.push("Your real name tells everyone who you are.");
+  if (warning.fields.length) {
+    parts.push(`Fewer than ${warning.k} other students on BeaverParty show the same ${listWords(warning.fields)} as you, so together they could point to you.`);
+  }
+  const save = el("button", { type: "button", textContent: "Save anyway" });
+  save.addEventListener("click", () => saveProfile(true));
+  const back = el("button", { type: "button", className: "secondary", textContent: "Go back and change it" });
+  back.addEventListener("click", () => { box.hidden = true; });
+  box.replaceChildren(el("p", {}, el("strong", { textContent: "Before you save: " }), parts.join(" ")),
+    el("p", { className: "small", textContent: "You can leave a field blank, or pick a whole course instead of a program." }),
+    el("p", { className: "actions" }, save, back));
+  box.hidden = false;
+  box.scrollIntoView({ block: "nearest" });
+}
+
+document.getElementById("profile-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  const form = event.target;
+  saveProfile(false);
+});
+
+async function saveProfile(acknowledgeRisk) {
+  const form = document.getElementById("profile-form");
+  document.getElementById("profile-risk").hidden = true;
   const games = [...document.querySelectorAll("#game-list .game-row")]
     .map((row) => {
       const [check, rank, ign] = row.querySelectorAll("input");
@@ -151,6 +181,7 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
       majors: [...pickedMajorsOrder],
       avatar: avatarChoice,
       games,
+      acknowledgeRisk,
     });
     const firstTime = !me.username;
     me.username = profile.username;
@@ -166,10 +197,14 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
     document.getElementById("profile-saved").hidden = false;
     loadProfile();
   } catch (err) {
+    if (err.status === 409 && err.data && err.data.warning) {
+      error.hidden = true;
+      return showRiskWarning(err.data.warning);
+    }
     error.textContent = err.message;
     error.hidden = false;
   }
-});
+}
 
 let avatarChoice = { color: "brown", item: "none" };
 
@@ -259,8 +294,11 @@ document.getElementById("report-form").addEventListener("submit", async (event) 
 // Avatar circles for a lobby's players, plus empty circles for open spots.
 function seats(lobby) {
   const row = el("div", { className: "seats", ariaLabel: `${lobby.members.length} of ${lobby.slots} spots taken` });
+  const held = lobby.held || 0;
   for (let i = 0; i < lobby.slots; i++) {
-    const seat = el("span", { className: i < lobby.members.length ? "seat filled" : "seat" });
+    const isHeld = i >= lobby.members.length && i < lobby.members.length + held;
+    const seat = el("span", { className: i < lobby.members.length ? "seat filled" : isHeld ? "seat held" : "seat" });
+    if (isHeld) seat.title = "Held for a player who reserved it";
     if (i < lobby.members.length) {
       seat.title = lobby.members[i];
       seat.append(beaverSvg(lobby.avatars[i], 38));
@@ -360,6 +398,8 @@ async function loadLobbies() {
   if (myLobbyId) await renderMyLobby();
   else {
     renderList(data.lobbies);
+    renderUpcoming(data.upcoming || []);
+    renderHolds(data.holds || []);
     await loadRecent();
   }
   connect();
@@ -375,6 +415,7 @@ function fillGameSelects() {
 
 function describe(lobby) {
   const bits = [`${lobby.members.length}/${lobby.slots} players`, lobby.vibe, lobby.voice ? "voice on" : "no voice"];
+  if (lobby.held) bits.splice(1, 0, `${lobby.held} held`);
   if (lobby.rank) bits.push(`rank: ${lobby.rank}`);
   return bits.join(" · ");
 }
@@ -395,6 +436,68 @@ function renderList(list) {
     return el("div", { className: "lobby-card" },
       el("div", {}, el("h3", { textContent: lobby.game }), el("p", { className: "muted", textContent: describe(lobby) }), seats(lobby), members),
       join);
+  }));
+}
+
+function startLabel(sqlTime) {
+  return new Date(sqlTime.replace(" ", "T") + "Z").toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
+// "Your spot is held" banners for lobbies you reserved that have opened.
+function renderHolds(holds) {
+  const box = document.getElementById("held-spots");
+  box.hidden = holds.length === 0;
+  box.replaceChildren(...holds.map((h) => {
+    const until = new Date(h.heldUntil.replace(" ", "T") + "Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const join = el("button", { type: "button", textContent: "Join" });
+    join.addEventListener("click", async () => {
+      try { await api("POST", `/api/lobbies/${h.id}/join`); showError("join-error", null); loadLobbies(); }
+      catch (err) { showError("join-error", err); }
+    });
+    return el("div", { className: "notice held-banner" },
+      el("span", {}, el("strong", { textContent: `Your ${h.game} lobby is open. ` }), `Your spot is held until ${until}.`), join);
+  }));
+}
+
+function renderUpcoming(list) {
+  document.getElementById("upcoming-section").hidden = list.length === 0;
+  document.getElementById("upcoming-list").replaceChildren(...list.map((u) => {
+    const bits = [`${u.reserved.length + 1}/${u.slots} spots reserved`, u.vibe, u.voice ? "voice on" : "no voice"];
+    if (u.rank) bits.push(`rank: ${u.rank}`);
+    const host = el("p", { className: "small" }, beaverSvg(u.avatar, 20), " Host: ", userLink(u.host));
+    const who = el("p", { className: "small" });
+    if (u.reserved.length) {
+      who.append("Reserved: ");
+      u.reserved.forEach((name, i) => who.append(i ? ", " : "", beaverSvg(u.reservedAvatars[i], 20), " ", userLink(name)));
+    }
+    const side = [];
+    if (!u.isMine) {
+      const full = !u.isReserved && u.reserved.length + 1 >= u.slots;
+      const b = el("button", { type: "button", className: u.isReserved ? "secondary" : "",
+        textContent: u.isReserved ? "Cancel reservation" : full ? "All spots reserved" : "Reserve a spot", disabled: full });
+      b.addEventListener("click", async () => {
+        try {
+          await api(u.isReserved ? "DELETE" : "POST", `/api/scheduled/${u.id}/reserve`);
+          showError("upcoming-error", null);
+          loadLobbies();
+        } catch (err) { showError("upcoming-error", err); }
+      });
+      side.push(b);
+    }
+    if (u.isMine) {
+      const cancel = el("button", { type: "button", className: "secondary", textContent: "Cancel" });
+      cancel.addEventListener("click", async () => {
+        if (!confirm("Cancel your scheduled lobby?")) return;
+        try { await api("DELETE", `/api/scheduled/${u.id}`); showError("upcoming-error", null); loadLobbies(); }
+        catch (err) { showError("upcoming-error", err); }
+      });
+      side.push(cancel);
+    }
+    return el("div", { className: "lobby-card upcoming" },
+      el("div", {}, el("h3", { textContent: u.game }),
+        el("p", { className: "when-label", textContent: `Opens ${startLabel(u.startsAt)}` }),
+        el("p", { className: "muted", textContent: bits.join(" · ") }), host, who),
+      ...side);
   }));
 }
 
@@ -476,15 +579,28 @@ document.querySelector("#create-form select[name=game]").addEventListener("chang
   document.getElementById("other-game").hidden = e.target.value !== "Other";
 });
 
+document.querySelector("#create-form select[name=when]").addEventListener("change", (e) => {
+  const later = e.target.value === "later";
+  document.getElementById("starts-at").hidden = !later;
+  document.getElementById("create-submit").textContent = later ? "Schedule" : "Create";
+});
+
 document.getElementById("create-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const f = event.target.elements;
   try {
+    let startsAt = null;
+    if (f.when.value === "later") {
+      if (!f.startsAt.value) throw new Error("Pick a start time.");
+      startsAt = new Date(f.startsAt.value).toISOString(); // the browser's local time -> UTC
+    }
     await api("POST", "/api/lobbies", {
       game: f.game.value, otherGame: f.otherGame.value, slots: Number(f.slots.value), vibe: f.vibe.value,
-      rank: f.rank.value, voice: f.voice.checked, discordInvite: f.discordInvite.value,
+      rank: f.rank.value, voice: f.voice.checked, discordInvite: f.discordInvite.value, startsAt,
     });
     event.target.reset();
+    document.getElementById("starts-at").hidden = true;
+    document.getElementById("create-submit").textContent = "Create";
     document.getElementById("create-box").open = false;
     showError("create-error", null);
     loadLobbies();
@@ -492,6 +608,13 @@ document.getElementById("create-form").addEventListener("submit", async (event) 
 });
 
 document.getElementById("filter-form").addEventListener("change", () => loadLobbies());
+// Typing a rank filters as you go, after a short pause.
+let rankTimer = null;
+document.querySelector("#filter-form input[name=rank]").addEventListener("input", () => {
+  clearTimeout(rankTimer);
+  rankTimer = setTimeout(loadLobbies, 300);
+});
+document.getElementById("filter-form").addEventListener("submit", (e) => { e.preventDefault(); loadLobbies(); });
 
 // ---- Endorsements for recently closed lobbies ----
 
@@ -726,14 +849,18 @@ function reportCard(r) {
     el("h3", { textContent: who + renamed }),
     el("p", { className: "small muted", textContent: r.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ") }));
   if (flags.length) card.append(el("p", { className: "small flag", textContent: `Note: ${flags.join("; ")}.` }));
+  if (r.source === "filter") {
+    card.append(el("p", { className: "small", textContent: "Caught by the chat filter, not reported by a student. The blocked messages are marked; nobody in the lobby saw them." }));
+  }
   if (r.details) card.append(el("blockquote", { textContent: r.details }));
   if (r.lobby) {
     card.append(el("p", { className: "small", textContent: `${r.lobby.game} lobby, ${shortDate(r.lobby.createdAt)}` }));
     const log = el("div", { className: "chat-log saved" });
     if (!r.messages.length) log.append(el("p", { className: "muted", textContent: "No chat messages." }));
     for (const m of r.messages) {
-      log.append(el("p", { className: m.reported ? "reported" : "" },
-        el("span", { className: `who ${m.reported ? "p2" : "p3"}`, textContent: m.who }), m.body,
+      log.append(el("p", { className: [m.reported ? "reported" : "", m.blocked ? "blocked" : ""].join(" ").trim() },
+        el("span", { className: `who ${m.reported ? "p2" : "p3"}`, textContent: m.who }),
+        m.blocked ? el("span", { className: "badge", textContent: "Blocked" }) : "", m.blocked ? " " : "", m.body,
         el("span", { className: "when", textContent: shortDate(m.createdAt) })));
     }
     card.append(log);

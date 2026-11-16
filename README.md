@@ -41,6 +41,7 @@ The email is only used to compute the anonymous ID and isn't stored.
 
 - **Block** (from a profile or a lobby roster): the blocked student isn't told. Neither sees lobbies the other is in or can join them, they can't endorse each other, the blocker stops seeing the other's chat messages, and neither sees the other's opt-in real name, dorm, or major. Unblock from My profile.
 - **Report** (from a lobby roster, a recent lobby, or a profile): pick a reason, add details if you want. The report saves a copy of the reported username and the lobby chat. The reported student never learns who reported them, and neither do moderators.
+- **Chat filter** (`server/chatfilter.js`): every lobby message is checked before it's saved. Slurs (the list in `server/chatfilter-words.txt`, which catches letter swaps like "3" for "e", stretched and spaced-out letters) and telling someone to kill themselves are blocked and go to the moderation queue with no reporter; repeat hits by the same student in the same lobby join one report. Phone numbers and email addresses are blocked but not queued, so moderators don't see a student's own contact details, and the sender is told to use Discord. Nobody in the lobby sees a blocked message.
 - **Moderation page** (moderators only): open reports with the saved chat. Moderators see usernames and chat, never real names, dorms, majors, or anonymous IDs. In the chat copy, everyone except the reported student is "Player 1", "Player 2", and so on. The queue flags students reported by several people, past warnings, and reporters who file many reports or many that get dismissed. Moderators don't see reports about themselves or that they filed.
 - **Decisions**: Dismiss, Warn (shown to the student once, next time they open the app), or Ban (signed out at once, can't sign in again, profile hidden, all their open reports resolved). Resolving deletes the saved copy and details; only the reason, decision, moderator, and date are kept. Bans can be lifted from the same page.
 - Moderators are labeled "Mod" in lobbies and "Moderator" on their profile.
@@ -101,10 +102,13 @@ server/     The Node.js server
   accounts.js accounts: banned and moderator flags
   blocks.js   blocking
   moderation.js reports, the moderation queue, warnings, and bans
-  profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors
+  profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors; the
+              re-identification warning (fewer than REID_K others share your dorm, majors, and ranks)
   catalog.js  fixed game, dorm, and major lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
-  lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup
+  lobbies.js  lobbies (open/full/closed, or scheduled up to 7 days ahead, with reserved spots held 10
+              minutes when it opens), list filters, members, chat, old-chat cleanup
+  chatfilter.js  chat text filter (word list in chatfilter-words.txt)
   events.js   live updates to browsers over Server-Sent Events
   friends.js  mutual friend requests, friends list, username search (3+ letters, prefix only)
   presence.js online/invisible status: online while the app is open, kept in memory only
@@ -118,4 +122,4 @@ test/       Tests (npm test)
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All six are built, plus blocking, friends, the Key Service, and the opt-in heat map. Still to come: rank and open-slot lobby filters, a chat text filter, scheduled lobbies, and the re-identification warning on profiles.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All six are built, plus blocking, friends, the Key Service, the opt-in heat map, rank and open-slot lobby filters, the chat text filter, scheduled lobbies, and the re-identification warning on profiles.

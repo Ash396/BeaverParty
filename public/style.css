@@ -126,7 +126,8 @@ button.secondary { background: var(--surface-2); color: var(--text); border-colo
 .create-box summary { cursor: pointer; font-weight: bold; }
 .form label.inline { display: flex; gap: 0.5rem; align-items: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
-.filters select { padding: 0.35rem; }
+.filters select, .filters input { padding: 0.35rem; }
+.filters input { width: 10rem; }
 .lobby-list { display: grid; gap: 0.75rem; }
 .lobby-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .lobby-card h3 { margin: 0 0 0.25rem; }
@@ -245,3 +246,14 @@ dialog.dialog h2 { margin: 0.75rem 0 0.25rem; overflow-wrap: anywhere; }
 .multi-options { max-height: 16rem; overflow-y: auto; padding: 0.25rem 0.6rem 0.5rem; border-top: 1px solid var(--border); }
 .multi-options label { display: block; margin: 0.15rem 0; }
 .multi-options .program { padding-left: 1.5rem; }
+
+/* Messages the chat filter blocked, in a moderator's saved copy. */
+.chat-log p.blocked { outline: 1px dashed var(--danger); outline-offset: 2px; border-radius: 4px; }
+
+/* Scheduled lobbies */
+.lobby-card.upcoming { border-style: dashed; }
+.when-label { color: var(--highlight); font-weight: bold; margin: 0.15rem 0; }
+.lobby-card.upcoming svg { vertical-align: middle; display: inline-block; }
+.seat.held { border-style: solid; border-color: var(--highlight); background: color-mix(in srgb, var(--highlight) 15%, transparent); }
+.held-banner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0.75rem 0; }
+.lobby-card.upcoming p.small svg { vertical-align: middle; }

@@ -68,19 +68,30 @@
               <label>Vibe <select name="vibe"><option value="casual">Casual</option><option value="competitive">Competitive</option></select></label>
               <label>Rank <span class="muted">(optional, e.g. "Gold+")</span> <input name="rank" maxlength="30"></label>
               <label class="inline"><input name="voice" type="checkbox"> Voice chat on</label>
+              <label>When <select name="when"><option value="now">Open now</option><option value="later">Schedule for later</option></select></label>
+              <label id="starts-at" hidden>Start time <span class="muted">(up to 7 days ahead)</span> <input name="startsAt" type="datetime-local"></label>
               <label>Discord invite <span class="muted">(optional, shown to members once the lobby fills)</span>
                 <input name="discordInvite" placeholder="https://discord.gg/..." maxlength="100"></label>
               <p id="create-error" class="error" hidden></p>
-              <p><button type="submit">Create</button></p>
+              <p><button type="submit" id="create-submit">Create</button></p>
             </form>
           </details>
+          <div id="held-spots" hidden></div>
           <form id="filter-form" class="filters">
             <select name="game" aria-label="Game"><option value="">All games</option></select>
             <select name="vibe" aria-label="Vibe"><option value="">Any vibe</option><option value="casual">Casual</option><option value="competitive">Competitive</option></select>
             <select name="voice" aria-label="Voice"><option value="">Voice on or off</option><option value="on">Voice on</option><option value="off">Voice off</option></select>
+            <input name="rank" type="search" maxlength="30" placeholder="Rank, e.g. Gold" aria-label="Rank">
+            <select name="open" aria-label="Open slots"><option value="">Any open slots</option><option value="2">2+ open</option><option value="3">3+ open</option><option value="4">4+ open</option><option value="5">5+ open</option></select>
           </form>
           <div id="lobby-list" class="lobby-list"></div>
           <p id="lobby-empty" class="muted" hidden>No open lobbies right now. Create one!</p>
+          <section id="upcoming-section" hidden>
+            <h2>Upcoming lobbies</h2>
+            <p class="muted small">Scheduled by their hosts. Reserve a spot and you're added when it opens if you have BeaverParty open; otherwise your spot is held for 10 minutes.</p>
+            <div id="upcoming-list" class="lobby-list"></div>
+            <p id="upcoming-error" class="error" hidden></p>
+          </section>
           <p id="join-error" class="error" hidden></p>
           <section id="recent-games" hidden>
             <h2>Endorse your recent teammates</h2>
@@ -127,6 +138,7 @@
               <span class="muted small">Pick a whole course, like Course 6, or a program, like 6-3. A program is more specific, so fewer students share it.</span>
             </div>
           </fieldset>
+          <div id="profile-risk" class="notice" role="alert" hidden></div>
           <p id="profile-error" class="error" hidden></p>
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
           <p id="preview-link" hidden><a href="#">See what other students see</a></p>
@@ -211,7 +223,7 @@
       </div>
       <div data-page="moderation" hidden>
         <h1>Moderation</h1>
-        <p class="small muted">You see the reported username and a saved copy of the chat. You never see who reported, real names, dorms, or majors. In the chat copy, the reported player is shown by username and everyone else as Player 1, 2, and so on. Resolving a report deletes its copy. Reports about you, or that you filed, go to the other moderators.</p>
+        <p class="small muted">You see the reported username and a saved copy of the chat. You never see who reported, real names, dorms, or majors. In the chat copy, the reported player is shown by username and everyone else as Player 1, 2, and so on. Resolving a report deletes its copy. Reports about you, or that you filed, go to the other moderators. Messages caught by the chat filter show up here too, with the blocked message marked.</p>
         <h2>Open reports <span id="mod-count" class="badge"></span></h2>
         <div id="mod-reports"></div>
         <p id="mod-empty" class="muted" hidden>No open reports.</p>

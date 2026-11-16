@@ -219,7 +219,9 @@ test("a ban signs them out, hides their profile, resolves their reports, and can
   const reports = (await call("mod", "GET", "/api/moderation")).body.reports.filter((x) => x.username === "user_bob2");
   assert.equal(reports.length, 2);
   assert.equal(reports[0].flags.openReportsAboutThem, 2);
+  await call("bob", "POST", "/api/lobbies", { game: "Minecraft", slots: 4, startsAt: new Date(Date.now() + 3600_000).toISOString() });
   assert.equal((await call("mod", "POST", `/api/moderation/reports/${reports[0].id}`, { action: "ban" })).status, 200);
+  assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM scheduled_lobbies WHERE host_anon_id = 'bob'").get().n, 0);
 
   assert.equal(accounts.find("bob").banned, true);
   assert.equal((await call("bob", "GET", "/api/profile")).status, 401);
@@ -247,4 +249,48 @@ test("deleting your account removes your blocks and warnings", async () => {
   assert.equal(left.n, 0);
   assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM warnings WHERE anon_id = 'dan'").get().n, 0);
   assert.deepEqual((await call("ann", "GET", "/api/blocks")).body.blocked, []);
+});
+
+// ---- Chat filter ----
+
+test("the chat filter blocks slurs and sends them to the queue, without a reporter", async () => {
+  const id = await newLobby("ann");
+  await call("cat", "POST", `/api/lobbies/${id}/join`);
+  await call("cat", "POST", `/api/lobbies/${id}/messages`, { body: "hey all" });
+  const blocked = await call("cat", "POST", `/api/lobbies/${id}/messages`, { body: "ur such a R3TARD" });
+  assert.equal(blocked.status, 400);
+  assert.match(blocked.body.error, /community rules/);
+  await call("cat", "POST", `/api/lobbies/${id}/messages`, { body: "kys" });
+  const chat = (await call("ann", "GET", `/api/lobbies/${id}`)).body.lobby.messages.map((m) => m.body);
+  assert.deepEqual(chat, ["hey all"], "blocked messages never reach the lobby");
+
+  const filtered = (await call("mod", "GET", "/api/moderation")).body.reports.filter((r) => r.source === "filter");
+  assert.equal(filtered.length, 2, "one report per kind of hit");
+  const slur = filtered.find((r) => /slur/.test(r.reason));
+  assert.equal(slur.username, "user_cat");
+  assert.deepEqual(slur.messages.map((m) => [m.who, m.body, Boolean(m.blocked)]),
+    [["user_cat", "hey all", false], ["user_cat", "ur such a R3TARD", true]]);
+  assert.equal(slur.flags.reporterReportsLast30Days, 0);
+
+  // A second slur in the same lobby joins the same report.
+  await call("cat", "POST", `/api/lobbies/${id}/messages`, { body: "f a g" });
+  const again = (await call("mod", "GET", "/api/moderation")).body.reports.find((r) => r.id === slur.id);
+  assert.equal(again.messages.filter((m) => m.blocked).length, 2);
+
+  // Resolving works like any report, and the saved copy goes.
+  assert.equal((await call("mod", "POST", `/api/moderation/reports/${slur.id}`, { action: "warn" })).status, 200);
+  for (const r of filtered) if (r.id !== slur.id) await call("mod", "POST", `/api/moderation/reports/${r.id}`, { action: "dismiss" });
+  assert.equal(db.get().prepare("SELECT snapshot FROM reports WHERE id = ?").get(slur.id).snapshot, null);
+});
+
+test("phone numbers and emails are blocked but not queued", async () => {
+  const id = await newLobby("ann");
+  await call("cat", "POST", `/api/lobbies/${id}/join`);
+  const before = (await call("mod", "GET", "/api/moderation")).body.reports.length;
+  for (const body of ["text me 617-555-0134", "cat@mit.edu"]) {
+    const res = await call("cat", "POST", `/api/lobbies/${id}/messages`, { body });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /Discord/);
+  }
+  assert.equal((await call("mod", "GET", "/api/moderation")).body.reports.length, before);
 });

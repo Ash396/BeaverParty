@@ -56,6 +56,9 @@ function loadConfig(env = process.env) {
     // Heat map: an hour is only saved if at least this many opted-in
     // players were in lobbies for that game (see heatmap.js).
     heatmapK: Math.max(2, Number(env.HEATMAP_K || 5)),
+    // Profiles: warn before saving opt-in fields (dorm, majors, ranks) that
+    // fewer than this many other students share (see profiles.js).
+    reidK: Math.max(1, Number(env.REID_K || 5)),
     dbPath: env.DB_PATH || path.join(__dirname, "..", "data", "beaverparty.db"),
     // Test-only: after login, show the email, name, and affiliation Petrock
     // sent. Never turn this on where real users sign in.

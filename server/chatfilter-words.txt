@@ -1,0 +1,21 @@
+# Words the chat filter blocks (see chatfilter.js). One per line, lowercase.
+# A message is blocked if any word in it matches a line here, ignoring case,
+# accents, common letter swaps (0 for o, 3 for e, $ for s, ...), stretched
+# letters ("niiice"), spaced-out letters, and a plural "s". Whole words only,
+# so a line won't match inside a longer, harmless word.
+#
+# This is a starting list of slurs. Moderators should add to it as they see
+# what gets through. Keep it to words that are never fine in lobby chat;
+# swearing on its own is allowed.
+chink
+fag
+faggot
+gook
+kike
+nigga
+nigger
+retard
+retarded
+spic
+tranny
+wetback

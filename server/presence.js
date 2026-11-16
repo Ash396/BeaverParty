@@ -75,4 +75,4 @@ function reset() {
   connections.clear();
 }
 
-module.exports = { connected, disconnected, isOnline, isInvisible, setInvisible, setListener, forget, reset, options };
+module.exports = { isConnected, connected, disconnected, isOnline, isInvisible, setInvisible, setListener, forget, reset, options };

@@ -253,3 +253,4 @@ dialog.dialog h2 { margin: 0.75rem 0 0.25rem; overflow-wrap: anywhere; }
 /* Scheduled lobbies */
 .lobby-card.upcoming { border-style: dashed; }
 .when-label { color: var(--highlight); font-weight: bold; margin: 0.15rem 0; }
+.lobby-card.upcoming svg { vertical-align: middle; display: inline-block; }

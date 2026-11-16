@@ -8,6 +8,7 @@ const { GAMES } = require("./catalog");
 const { ValidationError, avatarOf } = require("./profiles");
 const blocks = require("./blocks");
 const presence = require("./presence");
+const chatfilter = require("./chatfilter");
 
 const VIBES = ["casual", "competitive"];
 const MAX_SLOTS = 10;
@@ -239,6 +240,14 @@ function postMessage(anonId, id, body) {
   const times = (recentPosts.get(anonId) || []).filter((t) => now - t < 10_000);
   if (times.length >= 8) throw new ValidationError("Slow down a little.");
   recentPosts.set(anonId, [...times, now]);
+  const hit = chatfilter.check(clean);
+  if (hit) {
+    // Required here, not at the top: moderation.js requires this file.
+    if (hit.queue) require("./moderation").flagMessage(anonId, id, clean, hit.reason);
+    throw new ValidationError(hit.category === "contact"
+      ? "Not sent: phone numbers and email addresses can't go in lobby chat. Share contact details on Discord instead."
+      : "Not sent: this message looks like it breaks the community rules. Moderators will take a look.");
+  }
   const { lastInsertRowid } = db.get()
     .prepare("INSERT INTO messages (lobby_id, anon_id, body) VALUES (?, ?, ?)")
     .run(id, anonId, clean);

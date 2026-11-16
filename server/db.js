@@ -177,6 +177,36 @@ const MIGRATIONS = [
     PRIMARY KEY (anon_id, major)
   );
   `,
+  // 9: the chat filter files reports too (see chatfilter.js), so a report
+  // may have no reporter. source says who filed it. SQLite can't drop NOT
+  // NULL in place, so the table is rebuilt; nothing references it.
+  `
+  CREATE TABLE reports_new (
+    id               INTEGER PRIMARY KEY,
+    source           TEXT NOT NULL DEFAULT 'student' CHECK (source IN ('student', 'filter')),
+    reporter_anon_id TEXT REFERENCES accounts(anon_id),
+    reported_anon_id TEXT NOT NULL REFERENCES accounts(anon_id),
+    lobby_id         INTEGER REFERENCES lobbies(id),
+    reason           TEXT NOT NULL,
+    snapshot         TEXT,
+    status           TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+    created_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    resolved_at      TEXT,
+    details          TEXT,
+    action           TEXT CHECK (action IN ('dismissed', 'warned', 'banned')),
+    resolved_by      TEXT,
+    CHECK ((source = 'student') = (reporter_anon_id IS NOT NULL))
+  );
+  INSERT INTO reports_new (id, reporter_anon_id, reported_anon_id, lobby_id, reason, snapshot, status,
+    created_at, resolved_at, details, action, resolved_by)
+    SELECT id, reporter_anon_id, reported_anon_id, lobby_id, reason, snapshot, status,
+    created_at, resolved_at, details, action, resolved_by FROM reports;
+  DROP TABLE reports;
+  ALTER TABLE reports_new RENAME TO reports;
+  CREATE INDEX reports_status ON reports(status, created_at);
+  CREATE INDEX reports_reported ON reports(reported_anon_id);
+  CREATE INDEX reports_reporter ON reports(reporter_anon_id, created_at);
+  `,
 ];
 
 let db = null;

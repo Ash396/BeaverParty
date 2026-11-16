@@ -42,3 +42,10 @@ test("moderator flag round-trips", () => {
   accounts.setModerator("m1", true);
   assert.equal(accounts.find("m1").isModerator, true);
 });
+
+test("migration 9 keeps existing reports and lets the filter file reports", () => {
+  const conn = db.get();
+  const cols = conn.prepare("PRAGMA table_info(reports)").all().map((c) => c.name);
+  assert.ok(cols.includes("source"));
+  assert.equal(conn.prepare("PRAGMA table_info(reports)").all().find((c) => c.name === "reporter_anon_id").notnull, 0);
+});

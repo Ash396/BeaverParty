@@ -733,14 +733,18 @@ function reportCard(r) {
     el("h3", { textContent: who + renamed }),
     el("p", { className: "small muted", textContent: r.games.map((g) => (g.rank ? `${g.game} (${g.rank})` : g.game)).join(", ") }));
   if (flags.length) card.append(el("p", { className: "small flag", textContent: `Note: ${flags.join("; ")}.` }));
+  if (r.source === "filter") {
+    card.append(el("p", { className: "small", textContent: "Caught by the chat filter, not reported by a student. The blocked messages are marked; nobody in the lobby saw them." }));
+  }
   if (r.details) card.append(el("blockquote", { textContent: r.details }));
   if (r.lobby) {
     card.append(el("p", { className: "small", textContent: `${r.lobby.game} lobby, ${shortDate(r.lobby.createdAt)}` }));
     const log = el("div", { className: "chat-log saved" });
     if (!r.messages.length) log.append(el("p", { className: "muted", textContent: "No chat messages." }));
     for (const m of r.messages) {
-      log.append(el("p", { className: m.reported ? "reported" : "" },
-        el("span", { className: `who ${m.reported ? "p2" : "p3"}`, textContent: m.who }), m.body,
+      log.append(el("p", { className: [m.reported ? "reported" : "", m.blocked ? "blocked" : ""].join(" ").trim() },
+        el("span", { className: `who ${m.reported ? "p2" : "p3"}`, textContent: m.who }),
+        m.blocked ? el("span", { className: "badge", textContent: "Blocked" }) : "", m.blocked ? " " : "", m.body,
         el("span", { className: "when", textContent: shortDate(m.createdAt) })));
     }
     card.append(log);

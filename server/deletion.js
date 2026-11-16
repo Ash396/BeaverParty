@@ -32,6 +32,8 @@ function deleteAccount(anonId) {
     conn.prepare("UPDATE reports SET resolved_by = NULL WHERE resolved_by = ?").run(anonId);
     conn.prepare("DELETE FROM lobby_members WHERE anon_id = ?").run(anonId);
     conn.prepare("DELETE FROM scheduled_lobbies WHERE host_anon_id = ?").run(anonId);
+    conn.prepare("DELETE FROM scheduled_reservations WHERE anon_id = ?").run(anonId);
+    conn.prepare("DELETE FROM lobby_holds WHERE anon_id = ?").run(anonId);
     conn.prepare("DELETE FROM reports WHERE status = 'resolved' AND (reported_anon_id = ? OR reporter_anon_id = ?)")
       .run(anonId, anonId);
     if (!keepRow) {

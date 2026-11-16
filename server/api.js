@@ -7,6 +7,7 @@
 //   GET  /api/lobbies?game=&vibe=&voice=&rank=&open=  -> open lobbies (+ your current lobby id)
 //   POST /api/lobbies                     -> create a lobby (with startsAt: schedule it)
 //   DELETE /api/scheduled/:id             -> cancel your scheduled lobby
+//   POST | DELETE /api/scheduled/:id/reserve -> reserve a spot in someone's scheduled lobby, or not
 //   GET  /api/lobbies/:id                 -> lobby details (more for members)
 //   POST /api/lobbies/:id/join | leave | close
 //   POST /api/lobbies/:id/messages        -> send a chat message
@@ -97,6 +98,7 @@ async function handle(config, req, res, url) {
     const blockMatch = p.match(/^\/api\/blocks\/([^/]+)$/);
     const reportMatch = p.match(/^\/api\/moderation\/reports\/(\d+)$/);
     const scheduledMatch = p.match(/^\/api\/scheduled\/(\d+)$/);
+    const reserveMatch = p.match(/^\/api\/scheduled\/(\d+)\/reserve$/);
     const lobbyMatch = p.match(/^\/api\/lobbies\/(\d+)(?:\/(join|leave|close|messages))?$/);
 
     if (req.method === "GET" && p === "/api/catalog") {
@@ -134,6 +136,7 @@ async function handle(config, req, res, url) {
       if (lobbies.startDue()) events.publish("lobbies", "changed");
       json(res, 200, {
         upcoming: lobbies.upcoming(anonId),
+        holds: lobbies.holdsFor(anonId),
         lobbies: lobbies.list({
           game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice"), rank: q.get("rank"), open: q.get("open"),
         }, anonId),
@@ -143,6 +146,12 @@ async function handle(config, req, res, url) {
       const created = lobbies.create(anonId, body);
       events.publish("lobbies", "changed");
       json(res, 201, created);
+    } else if ((req.method === "POST" || req.method === "DELETE") && reserveMatch) {
+      const id = Number(reserveMatch[1]);
+      if (req.method === "POST") lobbies.reserve(anonId, id);
+      else lobbies.unreserve(anonId, id);
+      events.publish("lobbies", "changed");
+      json(res, 200, { reserved: req.method === "POST" });
     } else if (req.method === "DELETE" && scheduledMatch) {
       lobbies.cancelScheduled(anonId, Number(scheduledMatch[1]));
       events.publish("lobbies", "changed");

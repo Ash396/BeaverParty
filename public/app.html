@@ -76,6 +76,7 @@
               <p><button type="submit" id="create-submit">Create</button></p>
             </form>
           </details>
+          <div id="held-spots" hidden></div>
           <form id="filter-form" class="filters">
             <select name="game" aria-label="Game"><option value="">All games</option></select>
             <select name="vibe" aria-label="Vibe"><option value="">Any vibe</option><option value="casual">Casual</option><option value="competitive">Competitive</option></select>
@@ -87,7 +88,7 @@
           <p id="lobby-empty" class="muted" hidden>No open lobbies right now. Create one!</p>
           <section id="upcoming-section" hidden>
             <h2>Upcoming lobbies</h2>
-            <p class="muted small">Scheduled by their hosts. Each one opens at the time shown, and you can join it then.</p>
+            <p class="muted small">Scheduled by their hosts. Reserve a spot and you're added when it opens if you have BeaverParty open; otherwise your spot is held for 10 minutes.</p>
             <div id="upcoming-list" class="lobby-list"></div>
             <p id="upcoming-error" class="error" hidden></p>
           </section>

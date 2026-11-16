@@ -224,6 +224,24 @@ const MIGRATIONS = [
   );
   CREATE INDEX scheduled_lobbies_start ON scheduled_lobbies(starts_at);
   `,
+  // 11: reserving a spot in a scheduled lobby. When it opens, reservers who
+  // aren't there yet get a held seat until held_until (see lobbies.js).
+  `
+  CREATE TABLE scheduled_reservations (
+    scheduled_id INTEGER NOT NULL REFERENCES scheduled_lobbies(id) ON DELETE CASCADE,
+    anon_id      TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (scheduled_id, anon_id)
+  );
+  CREATE INDEX scheduled_reservations_anon ON scheduled_reservations(anon_id);
+  CREATE TABLE lobby_holds (
+    lobby_id   INTEGER NOT NULL REFERENCES lobbies(id) ON DELETE CASCADE,
+    anon_id    TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    held_until TEXT NOT NULL,
+    PRIMARY KEY (lobby_id, anon_id)
+  );
+  CREATE INDEX lobby_holds_anon ON lobby_holds(anon_id);
+  `,
 ];
 
 let db = null;

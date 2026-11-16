@@ -294,8 +294,11 @@ document.getElementById("report-form").addEventListener("submit", async (event) 
 // Avatar circles for a lobby's players, plus empty circles for open spots.
 function seats(lobby) {
   const row = el("div", { className: "seats", ariaLabel: `${lobby.members.length} of ${lobby.slots} spots taken` });
+  const held = lobby.held || 0;
   for (let i = 0; i < lobby.slots; i++) {
-    const seat = el("span", { className: i < lobby.members.length ? "seat filled" : "seat" });
+    const isHeld = i >= lobby.members.length && i < lobby.members.length + held;
+    const seat = el("span", { className: i < lobby.members.length ? "seat filled" : isHeld ? "seat held" : "seat" });
+    if (isHeld) seat.title = "Held for a player who reserved it";
     if (i < lobby.members.length) {
       seat.title = lobby.members[i];
       seat.append(beaverSvg(lobby.avatars[i], 38));
@@ -396,6 +399,7 @@ async function loadLobbies() {
   else {
     renderList(data.lobbies);
     renderUpcoming(data.upcoming || []);
+    renderHolds(data.holds || []);
     await loadRecent();
   }
   connect();
@@ -411,6 +415,7 @@ function fillGameSelects() {
 
 function describe(lobby) {
   const bits = [`${lobby.members.length}/${lobby.slots} players`, lobby.vibe, lobby.voice ? "voice on" : "no voice"];
+  if (lobby.held) bits.splice(1, 0, `${lobby.held} held`);
   if (lobby.rank) bits.push(`rank: ${lobby.rank}`);
   return bits.join(" · ");
 }
@@ -438,13 +443,47 @@ function startLabel(sqlTime) {
   return new Date(sqlTime.replace(" ", "T") + "Z").toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+// "Your spot is held" banners for lobbies you reserved that have opened.
+function renderHolds(holds) {
+  const box = document.getElementById("held-spots");
+  box.hidden = holds.length === 0;
+  box.replaceChildren(...holds.map((h) => {
+    const until = new Date(h.heldUntil.replace(" ", "T") + "Z").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    const join = el("button", { type: "button", textContent: "Join" });
+    join.addEventListener("click", async () => {
+      try { await api("POST", `/api/lobbies/${h.id}/join`); showError("join-error", null); loadLobbies(); }
+      catch (err) { showError("join-error", err); }
+    });
+    return el("div", { className: "notice held-banner" },
+      el("span", {}, el("strong", { textContent: `Your ${h.game} lobby is open. ` }), `Your spot is held until ${until}.`), join);
+  }));
+}
+
 function renderUpcoming(list) {
   document.getElementById("upcoming-section").hidden = list.length === 0;
   document.getElementById("upcoming-list").replaceChildren(...list.map((u) => {
-    const bits = [`${u.slots} players`, u.vibe, u.voice ? "voice on" : "no voice"];
+    const bits = [`${u.reserved.length + 1}/${u.slots} spots reserved`, u.vibe, u.voice ? "voice on" : "no voice"];
     if (u.rank) bits.push(`rank: ${u.rank}`);
     const host = el("p", { className: "small" }, beaverSvg(u.avatar, 20), " Host: ", userLink(u.host));
+    const who = el("p", { className: "small" });
+    if (u.reserved.length) {
+      who.append("Reserved: ");
+      u.reserved.forEach((name, i) => who.append(i ? ", " : "", beaverSvg(u.reservedAvatars[i], 20), " ", userLink(name)));
+    }
     const side = [];
+    if (!u.isMine) {
+      const full = !u.isReserved && u.reserved.length + 1 >= u.slots;
+      const b = el("button", { type: "button", className: u.isReserved ? "secondary" : "",
+        textContent: u.isReserved ? "Cancel reservation" : full ? "All spots reserved" : "Reserve a spot", disabled: full });
+      b.addEventListener("click", async () => {
+        try {
+          await api(u.isReserved ? "DELETE" : "POST", `/api/scheduled/${u.id}/reserve`);
+          showError("upcoming-error", null);
+          loadLobbies();
+        } catch (err) { showError("upcoming-error", err); }
+      });
+      side.push(b);
+    }
     if (u.isMine) {
       const cancel = el("button", { type: "button", className: "secondary", textContent: "Cancel" });
       cancel.addEventListener("click", async () => {
@@ -457,7 +496,7 @@ function renderUpcoming(list) {
     return el("div", { className: "lobby-card upcoming" },
       el("div", {}, el("h3", { textContent: u.game }),
         el("p", { className: "when-label", textContent: `Opens ${startLabel(u.startsAt)}` }),
-        el("p", { className: "muted", textContent: bits.join(" · ") }), host),
+        el("p", { className: "muted", textContent: bits.join(" · ") }), host, who),
       ...side);
   }));
 }

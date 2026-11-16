@@ -1,6 +1,9 @@
 // Lobbies and lobby chat. A host can open a lobby now or schedule it for
 // later (up to a week ahead, one at a time); a scheduled lobby is listed as
 // upcoming and opens at its time if the host isn't in another lobby then.
+// Others can reserve a spot in a scheduled lobby. When it opens, reservers
+// who have the app open and aren't in another lobby are added right away;
+// everyone else's seat is held for HOLD_MINUTES, then opens up to anyone.
 // A lobby is open until it has as many members as
 // slots (full), and closed when the host closes or leaves it. Members see
 // each other's in-game names for the lobby's game; the Discord invite is
@@ -72,6 +75,8 @@ const MAX_LEAD_DAYS = 7;
 // If the host is still in another lobby at start time, we keep trying for
 // this long, then drop the scheduled lobby.
 const GRACE_MINUTES = 30;
+const HOLD_MINUTES = 10;
+const MAX_RESERVATIONS = 3; // per student, across upcoming lobbies
 
 const sqlTime = (date) => date.toISOString().slice(0, 19).replace("T", " ");
 
@@ -141,18 +146,67 @@ function insertLobby(anonId, { game, slots, vibe, rank, voice, discord }) {
 
 // Upcoming scheduled lobbies, soonest first. Like open lobbies, ones hosted
 // by someone the viewer has a block with are left out, and so are banned hosts.
+// Upcoming scheduled lobbies, soonest first. Like open lobbies, ones where
+// the viewer has a block with the host or anyone who reserved are left out,
+// and so are banned hosts. Reservers are listed by username, like a roster.
 function upcoming(viewer = null) {
   const hide = viewer ? blocks.related(viewer) : new Set();
   return db.get().prepare(`
     SELECT s.* FROM scheduled_lobbies s JOIN accounts a ON a.anon_id = s.host_anon_id
     WHERE a.banned = 0 ORDER BY s.starts_at, s.id LIMIT 50
   `).all()
-    .filter((s) => !hide.has(s.host_anon_id))
-    .map((s) => ({
+    .map((s) => ({ s, reservers: reserverIds(s.id) }))
+    .filter(({ s, reservers }) => ![s.host_anon_id, ...reservers].some((m) => hide.has(m)))
+    .map(({ s, reservers }) => ({
       id: s.id, game: s.game, slots: s.slots, vibe: s.vibe, rank: s.rank, voice: Boolean(s.voice),
       host: usernameOf(s.host_anon_id), avatar: avatarOf(s.host_anon_id), startsAt: s.starts_at,
       isMine: s.host_anon_id === viewer,
+      reserved: reservers.map(usernameOf),
+      reservedAvatars: reservers.map(avatarOf),
+      isReserved: reservers.includes(viewer),
     }));
+}
+
+function reserverIds(scheduledId) {
+  return db.get().prepare(`
+    SELECT r.anon_id FROM scheduled_reservations r JOIN accounts a ON a.anon_id = r.anon_id
+    WHERE r.scheduled_id = ? AND a.banned = 0 ORDER BY r.created_at, r.rowid
+  `).all(scheduledId).map((r) => r.anon_id);
+}
+
+// Anon IDs with a seat held in this lobby right now.
+function heldIds(lobbyId) {
+  return db.get().prepare("SELECT anon_id FROM lobby_holds WHERE lobby_id = ? AND held_until > datetime('now')")
+    .all(lobbyId).map((r) => r.anon_id);
+}
+
+function reserve(anonId, scheduledId) {
+  if (!usernameOf(anonId)) throw new ValidationError("Create your profile first.");
+  const s = db.get().prepare("SELECT * FROM scheduled_lobbies WHERE id = ?").get(scheduledId);
+  if (!s) throw new NotFoundError("No such scheduled lobby.");
+  if (s.host_anon_id === anonId) throw new ValidationError("You're hosting this one, so your spot is saved.");
+  const reservers = reserverIds(scheduledId);
+  if (reservers.includes(anonId)) return;
+  // Same wording as a full lobby would get, so nobody learns about a block.
+  const related = blocks.related(anonId);
+  if ([s.host_anon_id, ...reservers].some((m) => related.has(m))) throw new ValidationError("You can't reserve a spot here.");
+  if (reservers.length + 1 >= s.slots) throw new ValidationError("Every spot is already reserved.");
+  const { n } = db.get().prepare("SELECT COUNT(*) AS n FROM scheduled_reservations WHERE anon_id = ?").get(anonId);
+  if (n >= MAX_RESERVATIONS) throw new ValidationError(`You can reserve up to ${MAX_RESERVATIONS} upcoming lobbies at a time.`);
+  db.get().prepare("INSERT INTO scheduled_reservations (scheduled_id, anon_id) VALUES (?, ?)").run(scheduledId, anonId);
+}
+
+function unreserve(anonId, scheduledId) {
+  db.get().prepare("DELETE FROM scheduled_reservations WHERE scheduled_id = ? AND anon_id = ?").run(scheduledId, anonId);
+}
+
+// Open lobbies where you have a seat held, for the "your spot is held" banner.
+function holdsFor(anonId) {
+  return db.get().prepare(`
+    SELECT l.id, l.game, h.held_until AS heldUntil FROM lobby_holds h JOIN lobbies l ON l.id = h.lobby_id
+    WHERE h.anon_id = ? AND h.held_until > datetime('now') AND l.state = 'open'
+    ORDER BY h.held_until
+  `).all(anonId).map((r) => ({ ...r }));
 }
 
 function cancelScheduled(anonId, id) {
@@ -162,8 +216,11 @@ function cancelScheduled(anonId, id) {
   db.get().prepare("DELETE FROM scheduled_lobbies WHERE id = ?").run(id);
 }
 
+// For a ban: their scheduled lobby, reservations, and held seats go.
 function dropScheduledFor(anonId) {
   db.get().prepare("DELETE FROM scheduled_lobbies WHERE host_anon_id = ?").run(anonId);
+  db.get().prepare("DELETE FROM scheduled_reservations WHERE anon_id = ?").run(anonId);
+  db.get().prepare("DELETE FROM lobby_holds WHERE anon_id = ?").run(anonId);
 }
 
 // Opens scheduled lobbies whose time has come. Runs every 30 seconds (and
@@ -182,9 +239,22 @@ function startDue(now = new Date()) {
       continue;
     }
     if (activeLobbyId(s.host_anon_id)) continue; // host is busy; try again next time
-    insertLobby(s.host_anon_id, {
+    const lobbyId = insertLobby(s.host_anon_id, {
       game: s.game, slots: s.slots, vibe: s.vibe, rank: s.rank, voice: s.voice, discord: s.discord_invite,
     });
+    // Reservers: in now if they have the app open and are free, else a held seat.
+    const holdUntil = sqlTime(new Date(now.getTime() + HOLD_MINUTES * 60_000));
+    const addMember = conn.prepare("INSERT INTO lobby_members (lobby_id, anon_id) VALUES (?, ?)");
+    const addHold = conn.prepare("INSERT INTO lobby_holds (lobby_id, anon_id, held_until) VALUES (?, ?, ?)");
+    const placed = [s.host_anon_id];
+    for (const r of reserverIds(s.id)) {
+      const related = blocks.related(r);
+      if (placed.some((m) => related.has(m))) continue; // a block since they reserved
+      if (presence.isConnected(r) && !activeLobbyId(r)) addMember.run(lobbyId, r);
+      else addHold.run(lobbyId, r, holdUntil);
+      placed.push(r);
+    }
+    updateFullness(lobbyId);
     conn.prepare("DELETE FROM scheduled_lobbies WHERE id = ?").run(s.id);
     changed++;
   }
@@ -203,6 +273,7 @@ function summary(lobby) {
     state: lobby.state,
     host: usernameOf(lobby.host_anon_id),
     members: members.map(usernameOf),
+    held: heldIds(lobby.id).length,
     avatars: members.map(avatarOf),
     online: members.map(presence.isOnline),
     createdAt: lobby.created_at,
@@ -224,7 +295,8 @@ function list({ game, vibe, voice, rank, open } = {}, viewer = null) {
   if (r) { where.push("instr(lower(rank), ?) > 0"); args.push(r); }
   const minOpen = Number(open);
   if (Number.isInteger(minOpen) && minOpen > 1) {
-    where.push("slots - (SELECT COUNT(*) FROM lobby_members m WHERE m.lobby_id = lobbies.id) >= ?");
+    where.push(`slots - (SELECT COUNT(*) FROM lobby_members m WHERE m.lobby_id = lobbies.id)
+      - (SELECT COUNT(*) FROM lobby_holds h WHERE h.lobby_id = lobbies.id AND h.held_until > datetime('now')) >= ?`);
     args.push(minOpen);
   }
   return db.get()
@@ -285,7 +357,14 @@ function join(anonId, id) {
   if (lobby.state !== "open") throw new ValidationError("This lobby isn't open.");
   // Same wording as a missing lobby, so nobody learns they've been blocked.
   if (hasBlockWith(anonId, id)) throw new ValidationError("You can't join this lobby.");
+  // Seats held for people who reserved them count as taken, except your own.
+  const held = heldIds(id).filter((h) => h !== anonId);
+  if (memberIds(id).length + held.length >= lobby.slots) {
+    const until = db.get().prepare("SELECT MIN(held_until) AS t FROM lobby_holds WHERE lobby_id = ? AND held_until > datetime('now')").get(id).t;
+    throw Object.assign(new ValidationError("The open spots are held for players who reserved them. Try again when the hold ends."), { heldUntil: until });
+  }
   db.get().prepare("INSERT INTO lobby_members (lobby_id, anon_id) VALUES (?, ?)").run(id, anonId);
+  db.get().prepare("DELETE FROM lobby_holds WHERE lobby_id = ? AND anon_id = ?").run(id, anonId);
   updateFullness(id);
 }
 
@@ -360,6 +439,6 @@ function deleteOldChats(days) {
 }
 
 module.exports = {
-  create, list, upcoming, cancelScheduled, dropScheduledFor, startDue, detail, join, leave, close, postMessage, deleteOldChats,
+  create, list, upcoming, reserve, unreserve, holdsFor, cancelScheduled, dropScheduledFor, startDue, detail, join, leave, close, postMessage, deleteOldChats,
   activeLobbyId, isMember, usernameOf, NotFoundError, ForbiddenError, VIBES,
 };

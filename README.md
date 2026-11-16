@@ -106,7 +106,8 @@ server/     The Node.js server
               re-identification warning (fewer than REID_K others share your dorm, majors, and ranks)
   catalog.js  fixed game, dorm, and major lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
-  lobbies.js  lobbies (open/full/closed, or scheduled up to 7 days ahead), list filters, members, chat, old-chat cleanup
+  lobbies.js  lobbies (open/full/closed, or scheduled up to 7 days ahead, with reserved spots held 10
+              minutes when it opens), list filters, members, chat, old-chat cleanup
   chatfilter.js  chat text filter (word list in chatfilter-words.txt)
   events.js   live updates to browsers over Server-Sent Events
   friends.js  mutual friend requests, friends list, username search (3+ letters, prefix only)

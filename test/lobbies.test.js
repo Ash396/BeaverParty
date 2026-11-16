@@ -205,6 +205,71 @@ test("a scheduled lobby waits while its host is busy, then gives up; hosts can c
   assert.ok(!(await call("ivy", "GET", "/api/lobbies")).body.upcoming.length);
 });
 
+test("reserve a spot: online reservers are added when it opens, others get a held seat", async () => {
+  for (const id of ["jo", "kim", "lee", "max", "ned"]) student(id);
+  const inAnHour = new Date(Date.now() + 3600_000).toISOString();
+  const sid = (await call("jo", "POST", "/api/lobbies", { ...valorant, slots: 4, startsAt: inAnHour })).body.scheduledId;
+  assert.equal((await call("jo", "POST", `/api/scheduled/${sid}/reserve`)).status, 400, "the host can't reserve");
+  for (const id of ["kim", "lee", "max"]) assert.equal((await call(id, "POST", `/api/scheduled/${sid}/reserve`)).status, 200);
+  assert.equal((await call("ned", "POST", `/api/scheduled/${sid}/reserve`)).status, 400, "every spot reserved");
+  const seen = (await call("ned", "GET", "/api/lobbies")).body.upcoming.find((u) => u.id === sid);
+  assert.deepEqual(seen.reserved, ["user_kim", "user_lee", "user_max"]);
+  assert.equal(seen.isReserved, false);
+  await call("max", "DELETE", `/api/scheduled/${sid}/reserve`);
+  assert.equal((await call("ned", "POST", `/api/scheduled/${sid}/reserve`)).status, 200, "max's spot freed up");
+
+  // kim has the app open; lee and ned don't.
+  const stream = await fetch(`${base}/api/events`, { headers: { Cookie: cookieFor("kim") } });
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(lobbies.startDue(new Date(Date.now() + 3601_000)), 1);
+  await stream.body.cancel();
+  const id = (await call("jo", "GET", "/api/lobbies")).body.myLobbyId;
+  const lobby = (await call("jo", "GET", `/api/lobbies/${id}`)).body.lobby;
+  assert.deepEqual(lobby.members, ["user_jo", "user_kim"]);
+  assert.equal(lobby.held, 2);
+
+  // Held seats count as taken: max can't take one, and the open filter agrees.
+  const blocked = await call("max", "POST", `/api/lobbies/${id}/join`);
+  assert.equal(blocked.status, 400);
+  assert.match(blocked.body.error, /held/);
+  assert.ok(!(await call("max", "GET", "/api/lobbies?open=2")).body.lobbies.some((l) => l.id === id));
+
+  // lee sees the banner and claims the held seat.
+  const holds = (await call("lee", "GET", "/api/lobbies")).body.holds;
+  assert.deepEqual(holds.map((h) => [h.id, h.game]), [[id, "Valorant"]]);
+  assert.equal((await call("lee", "POST", `/api/lobbies/${id}/join`)).status, 200);
+  assert.deepEqual((await call("lee", "GET", "/api/lobbies")).body.holds, []);
+
+  // ned's hold runs out, and then anyone can take the seat.
+  db.get().prepare("UPDATE lobby_holds SET held_until = datetime('now', '-1 minute') WHERE anon_id = 'ned'").run();
+  assert.deepEqual((await call("ned", "GET", "/api/lobbies")).body.holds, []);
+  assert.equal((await call("max", "POST", `/api/lobbies/${id}/join`)).status, 200);
+  assert.equal((await call("ned", "POST", `/api/lobbies/${id}/join`)).status, 400, "now full");
+  await call("jo", "POST", `/api/lobbies/${id}/close`);
+});
+
+test("reservations respect blocks and a per-student limit", async () => {
+  const at = (h) => new Date(Date.now() + h * 3600_000).toISOString();
+  const sid = (await call("kim", "POST", "/api/lobbies", { ...valorant, slots: 6, startsAt: at(2) })).body.scheduledId;
+  await call("lee", "POST", `/api/scheduled/${sid}/reserve`);
+  // ned blocked lee: ned no longer sees kim's lobby and can't reserve in it.
+  await call("ned", "PUT", "/api/blocks/user_lee");
+  assert.ok(!(await call("ned", "GET", "/api/lobbies")).body.upcoming.some((u) => u.id === sid));
+  assert.equal((await call("ned", "POST", `/api/scheduled/${sid}/reserve`)).status, 400);
+  await call("ned", "DELETE", "/api/blocks/user_lee");
+  // Up to 3 reservations at a time.
+  const others = [];
+  for (const host of ["jo", "max", "ned"]) {
+    others.push((await call(host, "POST", "/api/lobbies", { ...valorant, slots: 6, startsAt: at(3) })).body.scheduledId);
+  }
+  for (const o of others.slice(0, 2)) assert.equal((await call("lee", "POST", `/api/scheduled/${o}/reserve`)).status, 200);
+  assert.equal((await call("lee", "POST", `/api/scheduled/${others[2]}/reserve`)).status, 400);
+  // Cancelling the scheduled lobby drops its reservations.
+  await call("kim", "DELETE", `/api/scheduled/${sid}`);
+  assert.equal(db.get().prepare("SELECT COUNT(*) AS n FROM scheduled_reservations WHERE scheduled_id = ?").get(sid).n, 0);
+  for (const [host, o] of [["jo", others[0]], ["max", others[1]], ["ned", others[2]]]) await call(host, "DELETE", `/api/scheduled/${o}`);
+});
+
 test("old chat from closed lobbies is deleted", () => {
   db.get().prepare("UPDATE lobbies SET closed_at = datetime('now', '-8 days') WHERE id = ?").run(lobbyId);
   assert.equal(lobbies.deleteOldChats(7), 1);

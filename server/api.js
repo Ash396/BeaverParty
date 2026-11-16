@@ -111,8 +111,12 @@ async function handle(config, req, res, url) {
         // Someone you have a block with (either way) always looks offline.
         const otherId = profiles.anonIdOf(profile.username);
         const blocked = blocks.between(anonId, otherId);
+        // A block (either way) also hides the opt-in real name and dorm, so
+        // someone you blocked, or who blocked you, can't learn where you live.
         json(res, 200, { profile: {
           ...profile,
+          realName: blocked ? null : profile.realName,
+          dorm: blocked ? null : profile.dorm,
           online: profile.online && !blocked,
           badges: endorsements.counts(profile.username),
           blockedByMe: blocks.list(anonId).includes(profile.username),

@@ -118,7 +118,7 @@
             <legend>Optional <span class="muted">(leave blank to hide)</span></legend>
             <p class="notice small">Any signed-in student can see these on your profile. Your real name, or even your dorm combined with your games, can be enough for someone to work out who you are. Leave them blank to stay anonymous.</p>
             <label>Real name <input name="realName" maxlength="60" autocomplete="off"></label>
-            <label>Dorm <select name="dorm"><option value="">Don't show</option></select></label>
+            <label>Dorm or living group <select name="dorm"><option value="">Don't show</option></select></label>
           </fieldset>
           <p id="profile-error" class="error" hidden></p>
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
@@ -126,7 +126,7 @@
         </form>
         <section id="blocked-section" hidden>
           <h2>Blocked players</h2>
-          <p class="small muted">They aren't told. You won't see each other's lobbies, you can't endorse each other, and you won't see their chat messages.</p>
+          <p class="small muted">They aren't told. You won't see each other's lobbies, you can't endorse each other, you won't see their chat messages, and neither of you sees the other's real name or dorm.</p>
           <ul id="blocked-list" class="plain-list"></ul>
           <p id="blocked-empty" class="small muted">You haven't blocked anyone. You can block someone from their profile or a lobby.</p>
         </section>

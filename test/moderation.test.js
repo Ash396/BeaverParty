@@ -64,6 +64,22 @@ test("block and unblock from a username; you can't block yourself", async () => 
   assert.deepEqual((await call("ann", "GET", "/api/blocks")).body.blocked, []);
 });
 
+test("a block hides real name and dorm, in both directions", async () => {
+  const before = (await call("bob", "GET", "/api/profiles/user_ann")).body.profile;
+  assert.equal(before.dorm, "Burton Conner");
+  assert.equal(before.realName, "Real ann");
+  await call("ann", "PUT", "/api/blocks/user_bob");
+  for (const [viewer, target] of [["bob", "user_ann"], ["ann", "user_bob"]]) {
+    const p = (await call(viewer, "GET", `/api/profiles/${target}`)).body.profile;
+    assert.equal(p.dorm, null);
+    assert.equal(p.realName, null);
+  }
+  // Someone with no block still sees them.
+  assert.equal((await call("cat", "GET", "/api/profiles/user_ann")).body.profile.dorm, "Burton Conner");
+  await call("ann", "DELETE", "/api/blocks/user_bob");
+  assert.equal((await call("bob", "GET", "/api/profiles/user_ann")).body.profile.dorm, "Burton Conner");
+});
+
 test("a block hides lobbies and stops joining, in both directions", async () => {
   await call("ann", "PUT", "/api/blocks/user_bob");
   const annLobby = await newLobby("ann");

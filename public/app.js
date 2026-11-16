@@ -14,7 +14,7 @@ async function api(method, path, body) {
   });
   if (res.status === 401) location.replace("/");
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  if (!res.ok) throw Object.assign(new Error(data.error || "Something went wrong."), { status: res.status, data });
   return data;
 }
 
@@ -133,9 +133,39 @@ function renderMajorPicker(selected) {
 }
 let pickedMajorsOrder = [];
 
-document.getElementById("profile-form").addEventListener("submit", async (event) => {
+// The re-identification warning: the server answers 409 when what you're
+// about to show could point to you. Explain, and let the student go back or
+// save anyway.
+function listWords(words) {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+function showRiskWarning(warning) {
+  const box = document.getElementById("profile-risk");
+  const parts = [];
+  if (warning.realName) parts.push("Your real name tells everyone who you are.");
+  if (warning.fields.length) {
+    parts.push(`Fewer than ${warning.k} other students on BeaverParty show the same ${listWords(warning.fields)} as you, so together they could point to you.`);
+  }
+  const save = el("button", { type: "button", textContent: "Save anyway" });
+  save.addEventListener("click", () => saveProfile(true));
+  const back = el("button", { type: "button", className: "secondary", textContent: "Go back and change it" });
+  back.addEventListener("click", () => { box.hidden = true; });
+  box.replaceChildren(el("p", {}, el("strong", { textContent: "Before you save: " }), parts.join(" ")),
+    el("p", { className: "small", textContent: "You can leave a field blank, or pick a whole course instead of a program." }),
+    el("p", { className: "actions" }, save, back));
+  box.hidden = false;
+  box.scrollIntoView({ block: "nearest" });
+}
+
+document.getElementById("profile-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  const form = event.target;
+  saveProfile(false);
+});
+
+async function saveProfile(acknowledgeRisk) {
+  const form = document.getElementById("profile-form");
+  document.getElementById("profile-risk").hidden = true;
   const games = [...document.querySelectorAll("#game-list .game-row")]
     .map((row) => {
       const [check, rank, ign] = row.querySelectorAll("input");
@@ -151,6 +181,7 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
       majors: [...pickedMajorsOrder],
       avatar: avatarChoice,
       games,
+      acknowledgeRisk,
     });
     const firstTime = !me.username;
     me.username = profile.username;
@@ -166,10 +197,14 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
     document.getElementById("profile-saved").hidden = false;
     loadProfile();
   } catch (err) {
+    if (err.status === 409 && err.data && err.data.warning) {
+      error.hidden = true;
+      return showRiskWarning(err.data.warning);
+    }
     error.textContent = err.message;
     error.hidden = false;
   }
-});
+}
 
 let avatarChoice = { color: "brown", item: "none" };
 

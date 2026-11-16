@@ -102,7 +102,8 @@ server/     The Node.js server
   accounts.js accounts: banned and moderator flags
   blocks.js   blocking
   moderation.js reports, the moderation queue, warnings, and bans
-  profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors
+  profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors; the
+              re-identification warning (fewer than REID_K others share your dorm, majors, and ranks)
   catalog.js  fixed game, dorm, and major lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
   lobbies.js  lobbies (open/full/closed, or scheduled up to 7 days ahead), list filters, members, chat, old-chat cleanup
@@ -120,4 +121,4 @@ test/       Tests (npm test)
 
 ## Next steps
 
-The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All six are built, plus blocking, friends, the Key Service, and the opt-in heat map. Still to come: rank and open-slot lobby filters, a chat text filter, scheduled lobbies, and the re-identification warning on profiles.
+The proposal describes six services (Auth, Profile, Lobby, Presence, Endorsement, Moderation). All six are built, plus blocking, friends, the Key Service, the opt-in heat map, rank and open-slot lobby filters, the chat text filter, scheduled lobbies, and the re-identification warning on profiles.

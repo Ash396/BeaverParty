@@ -167,6 +167,16 @@ const MIGRATIONS = [
     value INTEGER NOT NULL
   );
   `,
+  // 8: opt-in majors, up to two, as codes from catalog.MAJORS ("6", "6-3").
+  // No rows means not shown. position keeps the student's order.
+  `
+  CREATE TABLE profile_majors (
+    anon_id  TEXT NOT NULL REFERENCES accounts(anon_id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    major    TEXT NOT NULL,
+    PRIMARY KEY (anon_id, major)
+  );
+  `,
 ];
 
 let db = null;

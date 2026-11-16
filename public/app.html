@@ -116,9 +116,16 @@
           </fieldset>
           <fieldset>
             <legend>Optional <span class="muted">(leave blank to hide)</span></legend>
-            <p class="notice small">Any signed-in student can see these on your profile. Your real name, or even your dorm combined with your games, can be enough for someone to work out who you are. Leave them blank to stay anonymous.</p>
+            <p class="notice small">Any signed-in student can see these on your profile. Your real name, or even your dorm or major combined with your games, can be enough for someone to work out who you are. Leave them blank to stay anonymous.</p>
             <label>Real name <input name="realName" maxlength="60" autocomplete="off"></label>
-            <label>Dorm <select name="dorm"><option value="">Don't show</option></select></label>
+            <label>Dorm or living group <select name="dorm"><option value="">Don't show</option></select></label>
+            <div class="field">Majors <span class="muted small">(up to 2)</span>
+              <details id="major-picker" class="multi-select">
+                <summary id="major-summary">Don't show</summary>
+                <div id="major-options" class="multi-options"></div>
+              </details>
+              <span class="muted small">Pick a whole course, like Course 6, or a program, like 6-3. A program is more specific, so fewer students share it.</span>
+            </div>
           </fieldset>
           <p id="profile-error" class="error" hidden></p>
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>
@@ -126,7 +133,7 @@
         </form>
         <section id="blocked-section" hidden>
           <h2>Blocked players</h2>
-          <p class="small muted">They aren't told. You won't see each other's lobbies, you can't endorse each other, and you won't see their chat messages.</p>
+          <p class="small muted">They aren't told. You won't see each other's lobbies, you can't endorse each other, you won't see their chat messages, and neither of you sees the other's real name, dorm, or major.</p>
           <ul id="blocked-list" class="plain-list"></ul>
           <p id="blocked-empty" class="small muted">You haven't blocked anyone. You can block someone from their profile or a lobby.</p>
         </section>
@@ -204,7 +211,7 @@
       </div>
       <div data-page="moderation" hidden>
         <h1>Moderation</h1>
-        <p class="small muted">You see the reported username and a saved copy of the chat. You never see who reported, real names, or dorms. In the chat copy, the reported player is shown by username and everyone else as Player 1, 2, and so on. Resolving a report deletes its copy. Reports about you, or that you filed, go to the other moderators.</p>
+        <p class="small muted">You see the reported username and a saved copy of the chat. You never see who reported, real names, dorms, or majors. In the chat copy, the reported player is shown by username and everyone else as Player 1, 2, and so on. Resolving a report deletes its copy. Reports about you, or that you filed, go to the other moderators.</p>
         <h2>Open reports <span id="mod-count" class="badge"></span></h2>
         <div id="mod-reports"></div>
         <p id="mod-empty" class="muted" hidden>No open reports.</p>

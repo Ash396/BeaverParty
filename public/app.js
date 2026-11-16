@@ -56,6 +56,7 @@ async function loadProfile() {
 
   const dorm = form.elements.dorm;
   if (dorm.options.length === 1) for (const d of catalog.dorms) dorm.append(el("option", { value: d, textContent: d }));
+  renderMajorPicker(profile ? profile.majors : []);
 
   const mine = new Map((profile ? profile.games : []).map((g) => [g.game, g]));
   const list = document.getElementById("game-list");
@@ -86,6 +87,52 @@ async function loadProfile() {
   if (profile) preview.querySelector("a").href = `#user/${encodeURIComponent(profile.username)}`;
 }
 
+// ---- Majors picker ----
+
+function majorLabel(code) {
+  for (const d of catalog.departments) {
+    if (code === d.code) return `Course ${d.code} (${d.name})`;
+    const p = d.programs.find(([c]) => c === code);
+    if (p) return `${p[0]} (${p[1]})`;
+  }
+  return code;
+}
+
+function pickedMajors() {
+  return [...document.querySelectorAll("#major-options input:checked")].map((c) => c.value);
+}
+
+function renderMajorPicker(selected) {
+  const order = [...selected];
+  const box = (code, label, cls) => {
+    const check = el("input", { type: "checkbox", value: code, checked: selected.includes(code) });
+    return el("label", { className: cls || "" }, check, " ", label);
+  };
+  const rows = [];
+  for (const d of catalog.departments) {
+    rows.push(box(d.code, `Course ${d.code} (${d.name})`));
+    // A program numbered like its department ("2") is the same pick as the department.
+    for (const [code, name] of d.programs) if (code !== d.code) rows.push(box(code, `${code} ${name}`, "program"));
+  }
+  for (const x of catalog.majorExtras) rows.push(box(x, x));
+  const options = document.getElementById("major-options");
+  options.replaceChildren(...rows);
+  const summary = document.getElementById("major-summary");
+  const sync = () => {
+    const picked = new Set(pickedMajors());
+    for (let i = order.length - 1; i >= 0; i--) if (!picked.has(order[i])) order.splice(i, 1);
+    for (const p of picked) if (!order.includes(p)) order.push(p);
+    const full = order.length >= catalog.maxMajors;
+    for (const c of options.querySelectorAll("input")) c.disabled = full && !c.checked;
+    summary.textContent = order.length ? order.map(majorLabel).join(", ") : "Don't show";
+  };
+  options.addEventListener("change", sync);
+  sync();
+  // Keep the student's order (first pick first) when saving.
+  pickedMajorsOrder = order;
+}
+let pickedMajorsOrder = [];
+
 document.getElementById("profile-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
@@ -101,6 +148,7 @@ document.getElementById("profile-form").addEventListener("submit", async (event)
       username: form.elements.username.value,
       realName: form.elements.realName.value,
       dorm: form.elements.dorm.value,
+      majors: [...pickedMajorsOrder],
       avatar: avatarChoice,
       games,
     });
@@ -579,6 +627,7 @@ async function loadUser(username) {
   const details = document.getElementById("user-details");
   const missing = document.getElementById("user-missing");
   name.textContent = username;
+  if (!catalog) catalog = await api("GET", "/api/catalog");
   details.replaceChildren();
   document.getElementById("user-avatar").replaceChildren();
   document.getElementById("user-friend").replaceChildren();
@@ -619,6 +668,7 @@ async function loadUser(username) {
     rows.push(["Badges", earned.length ? earned.map((b) => `${b.badge} × ${b.count}`).join(", ") : "None yet"]);
     if (profile.realName) rows.push(["Real name", profile.realName]);
     if (profile.dorm) rows.push(["Dorm", profile.dorm]);
+    if (profile.majors && profile.majors.length) rows.push([profile.majors.length > 1 ? "Majors" : "Major", profile.majors.map(majorLabel).join(", ")]);
     for (const [k, v] of rows) details.append(el("dt", { textContent: k }), el("dd", { textContent: v }));
   } catch {
     missing.hidden = false;

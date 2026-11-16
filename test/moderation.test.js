@@ -41,7 +41,7 @@ test.before(async () => {
   db.open(":memory:");
   for (const id of ["ann", "bob", "cat", "dan", "mod", "mod2"]) {
     accounts.findOrCreate(id);
-    profiles.save(id, { username: `user_${id}`, realName: `Real ${id}`, dorm: "Burton Conner", games: [{ game: "Minecraft", rank: "Gold" }] });
+    profiles.save(id, { username: `user_${id}`, realName: `Real ${id}`, dorm: "Burton Conner", majors: ["6-3", "18"], games: [{ game: "Minecraft", rank: "Gold" }] });
   }
   accounts.setModerator("mod", true);
   accounts.setModerator("mod2", true);
@@ -62,6 +62,24 @@ test("block and unblock from a username; you can't block yourself", async () => 
   assert.equal((await call("ann", "PUT", "/api/blocks/nobody")).status, 400);
   await call("ann", "DELETE", "/api/blocks/user_bob");
   assert.deepEqual((await call("ann", "GET", "/api/blocks")).body.blocked, []);
+});
+
+test("a block hides real name, dorm, and major, in both directions", async () => {
+  const before = (await call("bob", "GET", "/api/profiles/user_ann")).body.profile;
+  assert.equal(before.dorm, "Burton Conner");
+  assert.equal(before.realName, "Real ann");
+  assert.deepEqual(before.majors, ["6-3", "18"]);
+  await call("ann", "PUT", "/api/blocks/user_bob");
+  for (const [viewer, target] of [["bob", "user_ann"], ["ann", "user_bob"]]) {
+    const p = (await call(viewer, "GET", `/api/profiles/${target}`)).body.profile;
+    assert.equal(p.dorm, null);
+    assert.equal(p.realName, null);
+    assert.deepEqual(p.majors, []);
+  }
+  // Someone with no block still sees them.
+  assert.equal((await call("cat", "GET", "/api/profiles/user_ann")).body.profile.dorm, "Burton Conner");
+  await call("ann", "DELETE", "/api/blocks/user_bob");
+  assert.equal((await call("bob", "GET", "/api/profiles/user_ann")).body.profile.dorm, "Burton Conner");
 });
 
 test("a block hides lobbies and stops joining, in both directions", async () => {
@@ -138,11 +156,11 @@ test("the report keeps its own copy even if the user renames and chat is deleted
   assert.deepEqual(r.messages.map((m) => [m.who, m.body]), [["Player 1", "stop that"], ["user_bob", "something nasty"]]);
 });
 
-test("moderators see usernames and chat, but never real names, dorms, IDs, or the reporter", async () => {
+test("moderators see usernames and chat, but never real names, dorms, majors, IDs, or the reporter", async () => {
   const res = await call("mod", "GET", "/api/moderation");
   assert.equal(res.status, 200);
   const text = JSON.stringify(res.body);
-  for (const secret of ["Real ", "Burton Conner", "\"ann\"", "\"bob\"", "user_ann"]) {
+  for (const secret of ["Real ", "Burton Conner", "6-3", "\"ann\"", "\"bob\"", "user_ann"]) {
     assert.ok(!text.includes(secret), `moderation view leaked ${secret}`);
   }
   assert.equal(res.body.reports[0].flags.reporterReportsLast30Days, 1);

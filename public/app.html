@@ -119,7 +119,13 @@
             <p class="notice small">Any signed-in student can see these on your profile. Your real name, or even your dorm or major combined with your games, can be enough for someone to work out who you are. Leave them blank to stay anonymous.</p>
             <label>Real name <input name="realName" maxlength="60" autocomplete="off"></label>
             <label>Dorm or living group <select name="dorm"><option value="">Don't show</option></select></label>
-            <label>Major <select name="major"><option value="">Don't show</option></select></label>
+            <div class="field">Majors <span class="muted small">(up to 2)</span>
+              <details id="major-picker" class="multi-select">
+                <summary id="major-summary">Don't show</summary>
+                <div id="major-options" class="multi-options"></div>
+              </details>
+              <span class="muted small">Pick a whole course, like Course 6, or a program, like 6-3. A program is more specific, so fewer students share it.</span>
+            </div>
           </fieldset>
           <p id="profile-error" class="error" hidden></p>
           <p><button type="submit">Save</button> <span id="profile-saved" class="muted" hidden>Saved.</span></p>

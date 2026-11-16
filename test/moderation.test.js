@@ -41,7 +41,7 @@ test.before(async () => {
   db.open(":memory:");
   for (const id of ["ann", "bob", "cat", "dan", "mod", "mod2"]) {
     accounts.findOrCreate(id);
-    profiles.save(id, { username: `user_${id}`, realName: `Real ${id}`, dorm: "Burton Conner", major: "Course 6 (EECS)", games: [{ game: "Minecraft", rank: "Gold" }] });
+    profiles.save(id, { username: `user_${id}`, realName: `Real ${id}`, dorm: "Burton Conner", majors: ["6-3", "18"], games: [{ game: "Minecraft", rank: "Gold" }] });
   }
   accounts.setModerator("mod", true);
   accounts.setModerator("mod2", true);
@@ -68,13 +68,13 @@ test("a block hides real name, dorm, and major, in both directions", async () =>
   const before = (await call("bob", "GET", "/api/profiles/user_ann")).body.profile;
   assert.equal(before.dorm, "Burton Conner");
   assert.equal(before.realName, "Real ann");
-  assert.equal(before.major, "Course 6 (EECS)");
+  assert.deepEqual(before.majors, ["6-3", "18"]);
   await call("ann", "PUT", "/api/blocks/user_bob");
   for (const [viewer, target] of [["bob", "user_ann"], ["ann", "user_bob"]]) {
     const p = (await call(viewer, "GET", `/api/profiles/${target}`)).body.profile;
     assert.equal(p.dorm, null);
     assert.equal(p.realName, null);
-    assert.equal(p.major, null);
+    assert.deepEqual(p.majors, []);
   }
   // Someone with no block still sees them.
   assert.equal((await call("cat", "GET", "/api/profiles/user_ann")).body.profile.dorm, "Burton Conner");
@@ -160,7 +160,7 @@ test("moderators see usernames and chat, but never real names, dorms, majors, ID
   const res = await call("mod", "GET", "/api/moderation");
   assert.equal(res.status, 200);
   const text = JSON.stringify(res.body);
-  for (const secret of ["Real ", "Burton Conner", "EECS", "\"ann\"", "\"bob\"", "user_ann"]) {
+  for (const secret of ["Real ", "Burton Conner", "6-3", "\"ann\"", "\"bob\"", "user_ann"]) {
     assert.ok(!text.includes(secret), `moderation view leaked ${secret}`);
   }
   assert.equal(res.body.reports[0].flags.reporterReportsLast30Days, 1);

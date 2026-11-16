@@ -101,7 +101,7 @@ server/     The Node.js server
   accounts.js accounts: banned and moderator flags
   blocks.js   blocking
   moderation.js reports, the moderation queue, warnings, and bans
-  profiles.js profiles: username, games, opt-in real name, dorm, and major
+  profiles.js profiles: username, games, opt-in real name, dorm, and up to two majors
   catalog.js  fixed game, dorm, and major lists (games from the team survey)
   api.js      JSON API for signed-in students (profiles, lobbies, chat, live events)
   lobbies.js  lobbies (open/full/closed), members, chat, old-chat cleanup

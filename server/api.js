@@ -28,7 +28,7 @@
 //   GET  /api/moderation                  -> open reports, banned students, recent decisions
 //   POST /api/moderation/reports/:id      -> {action: dismiss | warn | ban}
 //   POST /api/moderation/unban            -> {username}
-const { GAMES, DORMS, MAJORS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
+const { GAMES, DORMS, DEPARTMENTS, MAJOR_EXTRAS, MAX_MAJORS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
 const { deleteAccount } = require("./deletion");
 const { cookie } = require("./session");
 const profiles = require("./profiles");
@@ -98,7 +98,7 @@ async function handle(config, req, res, url) {
 
     if (req.method === "GET" && p === "/api/catalog") {
       json(res, 200, {
-        games: GAMES, dorms: DORMS, majors: MAJORS, vibes: lobbies.VIBES,
+        games: GAMES, dorms: DORMS, departments: DEPARTMENTS, majorExtras: MAJOR_EXTRAS, maxMajors: MAX_MAJORS, vibes: lobbies.VIBES,
         avatarColors: AVATAR_COLORS, avatarItems: AVATAR_ITEMS, reportReasons: moderation.REASONS,
       });
     } else if (req.method === "GET" && p === "/api/profile") {
@@ -118,7 +118,7 @@ async function handle(config, req, res, url) {
           ...profile,
           realName: blocked ? null : profile.realName,
           dorm: blocked ? null : profile.dorm,
-          major: blocked ? null : profile.major,
+          majors: blocked ? [] : profile.majors,
           online: profile.online && !blocked,
           badges: endorsements.counts(profile.username),
           blockedByMe: blocks.list(anonId).includes(profile.username),

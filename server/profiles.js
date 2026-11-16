@@ -1,8 +1,8 @@
-// Profiles: username and games are always shown; real name, dorm, major, and
+// Profiles: username and games are always shown; real name, dorm, majors, and
 // ranks are opt-in. In-game names are private here and will only be shown
 // to members of a lobby for that game. Saving overwrites, so no history.
 const db = require("./db");
-const { GAMES, DORMS, MAJORS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
+const { GAMES, DORMS, MAJORS, MAX_MAJORS, AVATAR_COLORS, AVATAR_ITEMS } = require("./catalog");
 const presence = require("./presence");
 
 const USERNAME_RE = /^[A-Za-z0-9_-]{3,20}$/;
@@ -17,6 +17,22 @@ function clean(value, max) {
   return v || null;
 }
 
+function validateMajors(input) {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input) || input.some((m) => typeof m !== "string" || !MAJORS.has(m))) {
+    throw new ValidationError("Unknown major.");
+  }
+  if (input.length > MAX_MAJORS) throw new ValidationError(`Pick at most ${MAX_MAJORS} majors.`);
+  // Two picks in one department ("6" and "6-3", or "6-3" and "6-4") would
+  // be one major listed twice, unless both are real joint programs; keep it simple.
+  const depts = input.map((m) => MAJORS.get(m)).filter((d) => d !== null);
+  if (new Set(input).size !== input.length || new Set(depts).size !== depts.length) {
+    throw new ValidationError("Pick each department only once.");
+  }
+  if (input.includes("Undeclared") && input.length > 1) throw new ValidationError("Undeclared can't be combined with a major.");
+  return input;
+}
+
 function validate(input) {
   if (!input || typeof input !== "object") throw new ValidationError("expected a profile");
   const username = clean(input.username, 20);
@@ -25,8 +41,7 @@ function validate(input) {
   }
   const dorm = clean(input.dorm, 40);
   if (dorm && !DORMS.includes(dorm)) throw new ValidationError("Unknown dorm.");
-  const major = clean(input.major, 60);
-  if (major && !MAJORS.includes(major)) throw new ValidationError("Unknown major.");
+  const majors = validateMajors(input.majors);
   const games = Array.isArray(input.games) ? input.games : [];
   if (games.length === 0) throw new ValidationError("Pick at least one game.");
   const seen = new Set();
@@ -40,7 +55,7 @@ function validate(input) {
   const color = avatar.color || "brown";
   const item = avatar.item || "none";
   if (!AVATAR_COLORS.includes(color) || !AVATAR_ITEMS.includes(item)) throw new ValidationError("Unknown avatar.");
-  return { username, realName: clean(input.realName, 60), dorm, major, games: cleanGames, avatar: { color, item } };
+  return { username, realName: clean(input.realName, 60), dorm, majors, games: cleanGames, avatar: { color, item } };
 }
 
 // The avatar for each anon ID, for lobby rosters and cards.
@@ -57,7 +72,8 @@ function getOwn(anonId) {
     .all(anonId)
     .map((g) => ({ game: g.game, rank: g.rank, inGameName: g.in_game_name }));
   return {
-    username: row.username, realName: row.real_name, dorm: row.dorm, major: row.major, games,
+    username: row.username, realName: row.real_name, dorm: row.dorm, games,
+    majors: db.get().prepare("SELECT major FROM profile_majors WHERE anon_id = ? ORDER BY position").all(anonId).map((m) => m.major),
     avatar: { color: row.avatar_color, item: row.avatar_item },
     invisible: Boolean(row.invisible),
   };
@@ -78,7 +94,7 @@ function getPublic(username) {
     online: presence.isOnline(row.anon_id),
     realName: own.realName,
     dorm: own.dorm,
-    major: own.major,
+    majors: own.majors,
     avatar: own.avatar,
     games: own.games.map(({ game, rank }) => ({ game, rank })),
     isModerator: Boolean(row.is_moderator),
@@ -94,16 +110,19 @@ function save(anonId, input) {
   conn.exec("BEGIN");
   try {
     conn.prepare(`
-      INSERT INTO profiles (anon_id, username, real_name, dorm, major, avatar_color, avatar_item) VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO profiles (anon_id, username, real_name, dorm, avatar_color, avatar_item) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT (anon_id) DO UPDATE SET
-        username = excluded.username, real_name = excluded.real_name, dorm = excluded.dorm, major = excluded.major,
+        username = excluded.username, real_name = excluded.real_name, dorm = excluded.dorm,
         avatar_color = excluded.avatar_color, avatar_item = excluded.avatar_item, updated_at = datetime('now')
-    `).run(anonId, p.username, p.realName, p.dorm, p.major, p.avatar.color, p.avatar.item);
+    `).run(anonId, p.username, p.realName, p.dorm, p.avatar.color, p.avatar.item);
     conn.prepare("DELETE FROM profile_games WHERE anon_id = ?").run(anonId);
     const addGame = conn.prepare(
       "INSERT INTO profile_games (anon_id, game, rank, in_game_name) VALUES (?, ?, ?, ?)"
     );
     for (const g of p.games) addGame.run(anonId, g.game, g.rank, g.inGameName);
+    conn.prepare("DELETE FROM profile_majors WHERE anon_id = ?").run(anonId);
+    const addMajor = conn.prepare("INSERT INTO profile_majors (anon_id, position, major) VALUES (?, ?, ?)");
+    p.majors.forEach((m, i) => addMajor.run(anonId, i, m));
     conn.exec("COMMIT");
   } catch (err) {
     conn.exec("ROLLBACK");

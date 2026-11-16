@@ -28,7 +28,7 @@ const tim = {
   username: "TimBeaver",
   realName: "Tim Beaver",
   dorm: "Simmons",
-  major: "Course 18 (Mathematics)",
+  majors: ["6-3", "18"],
   games: [
     { game: "Valorant", rank: "Gold 2", inGameName: "tim#mit" },
     { game: "Minecraft" },
@@ -63,18 +63,25 @@ test("other students see the public view without in-game names", async () => {
   const { status, body } = await call("ann", "GET", "/api/profiles/timbeaver");
   assert.equal(status, 200);
   assert.equal(body.profile.realName, "Tim Beaver");
-  assert.equal(body.profile.major, "Course 18 (Mathematics)");
+  assert.deepEqual(body.profile.majors, ["6-3", "18"]);
   assert.deepEqual(body.profile.games.find((g) => g.game === "Valorant"), { game: "Valorant", rank: "Gold 2" });
   assert.ok(!JSON.stringify(body).includes("tim#mit"));
   assert.ok(!JSON.stringify(body).includes('"tim"'));
 });
 
 test("clearing an opt-in field removes it", async () => {
-  await call("tim", "PUT", "/api/profile", { ...tim, realName: "", dorm: null, major: "" });
+  await call("tim", "PUT", "/api/profile", { ...tim, realName: "", dorm: null, majors: [] });
   const { body } = await call("ann", "GET", "/api/profiles/TimBeaver");
   assert.equal(body.profile.realName, null);
   assert.equal(body.profile.dorm, null);
-  assert.equal(body.profile.major, null);
+  assert.deepEqual(body.profile.majors, []);
+});
+
+test("majors keep the order the student picked", async () => {
+  await call("tim", "PUT", "/api/profile", { ...tim, majors: ["21M", "6"] });
+  const { body } = await call("ann", "GET", "/api/profiles/TimBeaver");
+  assert.deepEqual(body.profile.majors, ["21M", "6"]);
+  await call("tim", "PUT", "/api/profile", tim);
 });
 
 test("usernames are unique regardless of case", async () => {
@@ -91,7 +98,13 @@ test("bad input is rejected", async () => {
     { ...tim, games: [{ game: "Some Rare Game" }] },
     { ...tim, games: [{ game: "Minecraft" }, { game: "Minecraft" }] },
     { ...tim, dorm: "Hogwarts" },
-    { ...tim, major: "Course 6-3" },
+    { ...tim, majors: ["Course 6-3"] },
+    { ...tim, majors: "6-3" },
+    { ...tim, majors: ["6-3", "18", "8"] },
+    { ...tim, majors: ["6", "6-3"] },
+    { ...tim, majors: ["6-3", "6-4"] },
+    { ...tim, majors: ["6-3", "6-3"] },
+    { ...tim, majors: ["Undeclared", "8"] },
     { ...tim, realName: "x".repeat(61) },
   ]) {
     assert.equal((await call("ann", "PUT", "/api/profile", bad)).status, 400, JSON.stringify(bad));

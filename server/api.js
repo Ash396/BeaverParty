@@ -3,7 +3,7 @@
 //   GET /api/profile            -> your own profile (or null)
 //   PUT /api/profile            -> create or update your profile
 //   GET /api/profiles/:username -> another student's public profile
-//   GET  /api/lobbies?game=&vibe=&voice=  -> open lobbies (+ your current lobby id)
+//   GET  /api/lobbies?game=&vibe=&voice=&rank=&open=  -> open lobbies (+ your current lobby id)
 //   POST /api/lobbies                     -> create a lobby
 //   GET  /api/lobbies/:id                 -> lobby details (more for members)
 //   POST /api/lobbies/:id/join | leave | close
@@ -129,7 +129,9 @@ async function handle(config, req, res, url) {
     } else if (req.method === "GET" && p === "/api/lobbies") {
       const q = url.searchParams;
       json(res, 200, {
-        lobbies: lobbies.list({ game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice") }, anonId),
+        lobbies: lobbies.list({
+          game: q.get("game"), vibe: q.get("vibe"), voice: q.get("voice"), rank: q.get("rank"), open: q.get("open"),
+        }, anonId),
         myLobbyId: lobbies.activeLobbyId(anonId),
       });
     } else if (req.method === "POST" && p === "/api/lobbies") {

@@ -492,6 +492,13 @@ document.getElementById("create-form").addEventListener("submit", async (event) 
 });
 
 document.getElementById("filter-form").addEventListener("change", () => loadLobbies());
+// Typing a rank filters as you go, after a short pause.
+let rankTimer = null;
+document.querySelector("#filter-form input[name=rank]").addEventListener("input", () => {
+  clearTimeout(rankTimer);
+  rankTimer = setTimeout(loadLobbies, 300);
+});
+document.getElementById("filter-form").addEventListener("submit", (e) => { e.preventDefault(); loadLobbies(); });
 
 // ---- Endorsements for recently closed lobbies ----
 

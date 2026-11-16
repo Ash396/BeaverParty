@@ -135,6 +135,23 @@ test("Other games and filters work", async () => {
   assert.equal((await call("ann", "GET", "/api/lobbies?voice=on")).body.lobbies.length, 0);
 });
 
+test("filter by rank (ignoring case) and by open slots", async () => {
+  for (const id of ["eve", "fay", "gus"]) student(id);
+  const gold = (await call("eve", "POST", "/api/lobbies", { ...valorant, slots: 5, rank: "Gold+" })).body.id;
+  const plat = (await call("fay", "POST", "/api/lobbies", { ...valorant, slots: 2, rank: "Platinum 1" })).body.id;
+  const games = async (q) => (await call("gus", "GET", `/api/lobbies?${q}`)).body.lobbies.map((l) => l.id);
+  assert.deepEqual(await games("rank=gold"), [gold]);
+  assert.deepEqual(await games("rank=PLAT"), [plat]);
+  assert.deepEqual(await games("rank=diamond"), []);
+  // eve's lobby has 4 open slots, fay's 1, dan's Balatro lobby 2.
+  assert.deepEqual(await games("open=3"), [gold]);
+  assert.ok((await games("open=2")).includes(gold));
+  assert.ok(!(await games("open=2")).includes(plat));
+  assert.equal((await games("open=nonsense")).length, (await games("")).length);
+  await call("eve", "POST", `/api/lobbies/${gold}/close`);
+  await call("fay", "POST", `/api/lobbies/${plat}/close`);
+});
+
 test("old chat from closed lobbies is deleted", () => {
   db.get().prepare("UPDATE lobbies SET closed_at = datetime('now', '-8 days') WHERE id = ?").run(lobbyId);
   assert.equal(lobbies.deleteOldChats(7), 1);

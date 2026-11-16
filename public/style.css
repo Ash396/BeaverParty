@@ -126,7 +126,8 @@ button.secondary { background: var(--surface-2); color: var(--text); border-colo
 .create-box summary { cursor: pointer; font-weight: bold; }
 .form label.inline { display: flex; gap: 0.5rem; align-items: center; }
 .filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
-.filters select { padding: 0.35rem; }
+.filters select, .filters input { padding: 0.35rem; }
+.filters input { width: 10rem; }
 .lobby-list { display: grid; gap: 0.75rem; }
 .lobby-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .lobby-card h3 { margin: 0 0 0.25rem; }

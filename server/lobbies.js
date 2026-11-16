@@ -116,12 +116,22 @@ function summary(lobby) {
 
 // Open lobbies, newest first, with optional filters. Lobbies with someone
 // the viewer has a block with (either way) are left out.
-function list({ game, vibe, voice } = {}, viewer = null) {
+//   rank: the lobby's rank contains this text (ignoring case), e.g. "gold"
+//         finds "Gold+" and "Gold 2". Lobbies with no rank set are left out.
+//   open: at least this many free slots, e.g. 3 for a group of three.
+function list({ game, vibe, voice, rank, open } = {}, viewer = null) {
   const where = ["state = 'open'"];
   const args = [];
   if (game) { where.push("game = ?"); args.push(game); }
   if (vibe) { where.push("vibe = ?"); args.push(vibe); }
   if (voice === "on" || voice === "off") { where.push("voice = ?"); args.push(voice === "on" ? 1 : 0); }
+  const r = typeof rank === "string" ? rank.trim().slice(0, 30).toLowerCase() : "";
+  if (r) { where.push("instr(lower(rank), ?) > 0"); args.push(r); }
+  const minOpen = Number(open);
+  if (Number.isInteger(minOpen) && minOpen > 1) {
+    where.push("slots - (SELECT COUNT(*) FROM lobby_members m WHERE m.lobby_id = lobbies.id) >= ?");
+    args.push(minOpen);
+  }
   return db.get()
     .prepare(`SELECT * FROM lobbies WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT 100`)
     .all(...args)

@@ -59,6 +59,10 @@ function loadConfig(env = process.env) {
     // Profiles: warn before saving opt-in fields (dorm, majors, ranks) that
     // fewer than this many other students share (see profiles.js).
     reidK: Math.max(1, Number(env.REID_K || 5)),
+    // Optional moderator list (see moderators.js). Unset means "leave
+    // moderators alone"; set (even empty) means "exactly these people".
+    moderators: env.MODERATORS === undefined ? null
+      : env.MODERATORS.split(",").map((s) => s.trim().toLowerCase()).filter((s) => s.includes("@")),
     dbPath: env.DB_PATH || path.join(__dirname, "..", "data", "beaverparty.db"),
     // Test-only: after login, show the email, name, and affiliation Petrock
     // sent. Never turn this on where real users sign in.

@@ -35,6 +35,8 @@ npm run set-moderator -- someone@mit.edu
 npm run set-moderator -- someone@mit.edu --remove
 ```
 
+On Hyades, `exec` can't run commands in our app (it fails with a `chown /dev/pts` error because the app runs as a non-root user), so use the `MODERATORS` setting instead. Run `edit`, add `"MODERATORS": "kerb1@mit.edu,kerb2@mit.edu"` under the `beaverparty` envs, then `restart beaverparty`. When `MODERATORS` is set, it's the whole list: everyone on it becomes a moderator and everyone else stops being one. To remove someone, take them off and restart. If it's not set, moderators are left alone. Check `logs beaverparty` for "Moderators set from MODERATORS". The emails are only used to compute anonymous IDs, but note that they sit in plain text in the Hyades settings.
+
 The email is only used to compute the anonymous ID and isn't stored.
 
 ### Blocking, reports, and moderation

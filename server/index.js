@@ -51,6 +51,7 @@ if (require.main === module && process.env.ROLE === "keys") {
 } else if (require.main === module) {
   const config = loadConfig();
   db.open(config.dbPath);
+  require("./moderators").syncWithRetry(config);
   // Delete old lobby chat now and every hour.
   const cleanup = () => {
     const n = require("./lobbies").deleteOldChats(config.chatRetentionDays);
